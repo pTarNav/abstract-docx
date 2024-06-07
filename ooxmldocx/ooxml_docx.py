@@ -12,14 +12,21 @@ from lxml.etree import _Element as etreeElement
 
 
 class OoxmlPart:
+	"""
+	Represents an OOXML (Office Open XML) part, which is a component of an OOXML package.
+	"""
+
 	name: str
 	extension: Literal[".xml", ".rels"]
 	element: etreeElement
 
 	def __init__(self, docx_file_content_element: dict) -> None:
 		"""
+		Initializes an OOXML part with the content of a DOCX file element.
 
-		:param docx_file_content_element:
+		:param docx_file_content_element: A dictionary containing 'name_tail' and 'content' keys,
+		representing the file name and its content.
+		:type docx_file_content_element: dict
 		"""
 
 		self.name, self.extension = self._get_name_and_extension_from_docx_file_name(
@@ -30,9 +37,12 @@ class OoxmlPart:
 	@staticmethod
 	def _get_name_and_extension_from_docx_file_name(name_tail: str) -> tuple[str, str]:
 		"""
+		Extracts the name and extension from the DOCX file name.
 
-		:param name_tail:
-		:return name, extension:
+		:param name_tail: The file name string to extract the name and extension from.
+		:type name_tail: str
+		:return: A tuple containing the name and extension of the file.
+		:rtype: tuple[str, str]
 		"""
 
 		regex_result = re.match(r"(.+)(\.[^.]+$)", name_tail)
@@ -40,6 +50,12 @@ class OoxmlPart:
 
 
 class OoxmlPackage:
+	"""
+	Represents an OOXML (Office Open XML) package, which can contain multiple parts
+	and nested packages. It processes the content of a DOCX file to organize and
+	manage these parts and packages.
+	"""
+
 	name: str
 	parts: dict[str, OoxmlPart] = {}
 	packages: Optional[dict[str, OoxmlPackage]] = None
@@ -47,8 +63,13 @@ class OoxmlPackage:
 
 	def __init__(self, name: str, docx_file_content: list) -> None:
 		"""
+		Initializes an OOXML package with a given name and DOCX file content.
 
-		:param docx_file_content:
+		:param name: The name of the OOXML package.
+		:type name: str
+		:param docx_file_content: The content of the DOCX file represented as a list of dictionaries,
+		where each dictionary contains 'name_tail' and 'content' keys.
+		:type docx_file_content: list
 		"""
 
 		self.name = name
@@ -56,8 +77,11 @@ class OoxmlPackage:
 
 	def _load_package_content(self, docx_file_content: list) -> None:
 		"""
+		Loads and processes the content of the DOCX file into the package.
 
-		:param docx_file_content:
+		:param docx_file_content: The content of the DOCX file represented as a list of dictionaries,
+		where each dictionary contains 'name_tail' and 'content' keys.
+		:type docx_file_content: list
 		"""
 
 		package_content = self._prepare_package_content(docx_file_content=docx_file_content)
@@ -66,9 +90,14 @@ class OoxmlPackage:
 	@staticmethod
 	def _prepare_package_content(docx_file_content: list) -> dict:
 		"""
+		Prepares the package content by organizing DOCX file content into a structured dictionary.
 
-		:param docx_file_content:
-		:return package_content:
+		:param docx_file_content: The content of the DOCX file represented as a list of dictionaries,
+		where each dictionary contains 'name_tail' and 'content' keys.
+		:type docx_file_content: list
+		:return: A dictionary where the keys are the main part names and the values are lists of
+		content elements.
+		:rtype: dict
 		"""
 
 		package_content = {}
@@ -88,8 +117,11 @@ class OoxmlPackage:
 
 	def _process_package_content(self, package_content: dict) -> None:
 		"""
+		Processes the prepared package content, organizing it into parts and nested packages.
 
-		:param package_content:
+		:param package_content: A dictionary where the keys are the main part names and the values
+		are lists of content elements.
+		:type package_content: dict
 		"""
 
 		for f_name, f_content in package_content.items():
@@ -108,6 +140,13 @@ class OoxmlPackage:
 
 
 class OoxmlDocx:
+	"""
+	A class to represent and process a .docx file as an OOXML (Office Open XML) package.
+
+	This class handles the reading and parsing of a .docx file, organizing its contents
+	into appropriate OOXML components.
+	"""
+
 	docx_file_path: str
 
 	word: OoxmlPackage
@@ -119,16 +158,20 @@ class OoxmlDocx:
 
 	def __init__(self, docx_file_path: str) -> None:
 		"""
+		Initializes the OoxmlDocx instance with the given .docx file path.
 
-		:param docx_file_path:
+		:param docx_file_path: The file path to the .docx file.
+		:type docx_file_path: str
 		"""
 
 		self.docx_file_path = docx_file_path
 		self._load_docx_file_contents()
+		print(self.word)
 
 	def _load_docx_file_contents(self) -> None:
 		"""
-		Reads the .docx file as a zip file in memory, loading each content into its correspondent OoxmlDocx content
+		Reads the .docx file as a zip file in memory, loading each content into its
+		corresponding OoxmlDocx content.
 		"""
 
 		docx_file_content = self._prepare_docx_file_content()
@@ -136,8 +179,10 @@ class OoxmlDocx:
 
 	def _prepare_docx_file_content(self) -> dict:
 		"""
+		Prepares the .docx file content by reading the file and extracting XML and relationship files.
 
-		:return docx_file_content:
+		:return: A dictionary representing the file content organized by the main parts of the .docx file.
+		:rtype: dict
 		"""
 
 		docx_file_content = {}
@@ -148,9 +193,9 @@ class OoxmlDocx:
 						# Divide the file name by the first '/' character
 						f_name_head, f_name_tail = (f_name.split("/", maxsplit=1) + [""])[:2]
 						docx_file_content_element = {
-								"name_tail": f_name_tail if f_name_tail != "" else f_name_head,
-								"content": zip_ref.read(f_name)
-							}
+							"name_tail": f_name_tail if f_name_tail != "" else f_name_head,
+							"content": zip_ref.read(f_name)
+						}
 						if f_name_head in docx_file_content.keys():
 							docx_file_content[f_name_head].append(docx_file_content_element)
 						else:
@@ -160,8 +205,11 @@ class OoxmlDocx:
 
 	def _process_docx_file_content(self, docx_file_content: dict) -> None:
 		"""
+		Processes the prepared .docx file content, assigning it to the appropriate attributes.
 
-		:param docx_file_content:
+		:param docx_file_content: The dictionary representing the file content organized by the main parts of the .docx file.
+		:type docx_file_content: dict
+		:raises KeyError: If a match is not found for a root .docx package/part.
 		"""
 
 		for f_name, f_content in docx_file_content.items():
