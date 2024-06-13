@@ -14,18 +14,13 @@ def tab(d: int) -> str:
 
 class OoxmlGraph:
 	html_main_template: str = lambda _, file, styles, graph: \
-		f"""
-<!DOCTYPE html>
-<html>
-\t<head>
-\t\t<title>{file}</title>
-\t\t<style>{styles}</style>
-\t</head>
-\t<body>
-{graph}
-\t</body>
-</html>
-"""
+		(
+			f"<!DOCTYPE html>\n"
+			f"<html>\n"
+			f"\t<head>\n\t\t<title>{file}</title>\n\t\t<style>{styles}</style>\n\t</head>"
+			f"\t<body>\n{graph}\n\t</body>\n"
+			f"</html>"
+		)
 
 	html_ooxml_element_template: str = lambda _, depth, tag, children: \
 		(
