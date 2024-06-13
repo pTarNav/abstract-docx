@@ -64,12 +64,11 @@ class OoxmlPackage:
 		:param docx_file_content: The content of the .docx file represented as a list of dictionaries,
 		where each dictionary contains 'name_tail' and 'content' keys.
 		"""
-		self.name: str
+		self.name = name
 		self.parts: dict[str, OoxmlPart] = {}
 		self.packages: Optional[dict[str, OoxmlPackage]] = None
 		self._rels: Optional[OoxmlPackage] = None
 
-		self.name = name
 		self._load_package_content(docx_file_content=docx_file_content)
 
 	def _load_package_content(self, docx_file_content: list) -> None:
@@ -164,14 +163,13 @@ class OoxmlDocx:
 
 		:param docx_file_path: The file path to the .docx file.
 		"""
-		self.docx_file_path: str
+		self.docx_file_path = docx_file_path
 		self.word: OoxmlPackage
 		self.doc_props: OoxmlPackage
 		self.custom_xml: Optional[OoxmlPackage] = None
 		self._content_types: Optional[OoxmlPart] = None
 		self._rels: Optional[OoxmlPackage] = None
 
-		self.docx_file_path = docx_file_path
 		self._load_docx_file_contents()
 
 	def _load_docx_file_contents(self) -> None:
@@ -233,7 +231,10 @@ class OoxmlDocx:
 					raise KeyError(f"Match not found for root .docx package/part {f_name}.")
 
 	def __str__(self):
-		s = f"{self.docx_file_path}\n"
+		s = f"<< {self.docx_file_path} >> "
+		s += f"([Content_Types]?={'y' if self._content_types is not None else 'n'}, "
+		s += f"_rels?={'y' if self._rels is not None else 'n'})\n"
+
 		s += self.word._custom_str(depth=1)
 		s += self.doc_props._custom_str(depth=1)
 		if self.custom_xml is not None:
