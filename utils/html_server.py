@@ -1,9 +1,7 @@
-import sys
 import threading
 import http.server
 import socketserver
 import webbrowser
-import requests
 
 
 class HTMLServer:

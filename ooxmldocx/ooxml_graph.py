@@ -1,15 +1,17 @@
-import re
-
+from lxml import etree
 from lxml.etree import _Element as etreeElement
 
 from ooxmldocx.ooxml_docx import OoxmlDocx, OoxmlPackage, OoxmlPart
+from utils.etree_element_aux import remove_nsmap
 from utils.html_server import HTMLServer
+
 
 def tab(d: int) -> str:
 	"""
-	Auxiliary template for html indentation for elements inside the body.
+	Auxiliary template for html indentation for elements inside the body, always adding +2 to the depth to
+	compensate for initial html and body tags indentation.
 	:param d: Depth of the indentation.
-	:return:
+	:return: Indentation string.
 	"""
 	return "\t"*(d+2)
 
@@ -24,16 +26,51 @@ class OoxmlGraph:
 			f"</html>"
 		)
 
-	html_ooxml_element_template: str = lambda _, depth, tag, children: \
+	html_ooxml_element_template: str = lambda _, depth, tag, text, attributes, children: \
 		(
 			f"{tab(d=2*depth)}<div class='ooxml_element_node'>\n"
-			f"{tab(d=2*depth+1)}<div class='ooxml_element_tag'>{tag}</div>\n"
+			f"{tab(d=2*depth+1)}<div class='ooxml_element_node_top'>\n"
+			f"{tab(d=2*depth+2)}<div class='ooxml_element_tag'><b>&lt{tag}&gt</b></div>\n"
+			f"{
+				f'{tab(d=2*depth+2)}<div class={chr(39)}ooxml_element_attributes{chr(39)}>{chr(10)}' 
+				if len(attributes) != 0 else ''
+			}"
+			f"{chr(10).join([
+				f'{tab(d=2*depth+3)}<div class={chr(39)}ooxml_element_attribute{chr(39)}><b>{attr_key}</b>: '
+				f'{chr(39)}{attr_val}{chr(39)}</div>' 
+				for attr_key, attr_val in attributes.items()
+			])}"
+			f"{f'{chr(10)}{tab(d=2*depth+2)}</div>{chr(10)}' if len(attributes) != 0 else ''}"
+			f"{tab(d=2*depth+1)}</div>\n"
+			f"{
+				f'<div class={chr(39)}ooxml_element_text{chr(39)}><i>{text}</i></div>{chr(10)}'
+				if text is not None else ''
+			}"
 			# Children template (not included if leaf node)
-			f"{f'{tab(d=2*depth+1)}<div class={chr(39)}ooxml_element_children{chr(39)}>{chr(10)}' if len(children) != 0 else ''}"
+			f"{
+				f'{tab(d=2*depth+1)}<div class={chr(39)}ooxml_element_children{chr(39)}>{chr(10)}'
+				if len(children) != 0 else ''
+			}"
 			f"{chr(10).join([child for child in children]) if len(children) != 0 else ''}"
 			f"{f'{chr(10)}{tab(d=2*depth+1)}</div>{chr(10)}' if len(children) != 0 else ''}"
+			f"{
+				f'{tab(d=2*depth+1)}<div class={chr(39)}ooxml_element_node_bottom{chr(39)}></div>{chr(10)}'
+				if len(children) != 0 else ''
+			}"
 			f"{tab(d=2*depth)}</div>"
 		)
+
+	__DEBUG = False
+	styles = (
+		f"{'div { border: 1px solid red; }' if __DEBUG else ''}\n"
+		f"html {{ background-color: black; color: white; }}"
+		f".ooxml_element_node {{ margin-left: 2rem; border-left: 1px solid LightBlue; padding-left: 0.5rem; }}\n"
+		f".ooxml_element_node_top {{ display: flex; flex-direction: row; gap: 1rem; }}"
+		f".ooxml_element_node_bottom {{ height: 0.5rem; }}"
+		f".ooxml_element_tag {{ font-size: 1rem; color: #4287f5; }}"
+		f".ooxml_element_attributes {{ display: flex; flex-direction: row; gap: 0.5rem; }}"
+		f".ooxml_element_text {{ color: LightBlue; }}"
+	)
 
 	def __init__(self, ooxml_structure: OoxmlDocx | OoxmlPackage | OoxmlPart):
 		"""
@@ -66,13 +103,10 @@ class OoxmlGraph:
 		:return:
 		"""
 
-		styles = (
-			f":root {{ --indentation-size: 2rem; }}\n"
-			f".ooxml_element_node {{ padding-left: 2rem; }}"
-		)
-
 		self.html_output = self.html_main_template(
-			file="x", styles=styles, graph=self._build_ooxml_element(element=self.ooxml_structure.element)
+			file=self.ooxml_structure.name,
+			styles=self.styles,
+			graph=self._build_ooxml_element(element=self.ooxml_structure.element)
 		)
 
 	def _build_ooxml_element(self, element: etreeElement, depth: int = 0) -> str:
@@ -85,7 +119,9 @@ class OoxmlGraph:
 
 		return self.html_ooxml_element_template(
 			depth=depth,
-			tag=re.sub(r"\{.*?}(\w)", lambda m: m.group(0)[-1], element.tag),
+			tag=remove_nsmap(element.tag),
+			text=element.text,
+			attributes={remove_nsmap(attr_key): attr_val for attr_key, attr_val in element.attrib.items()},
 			children=[self._build_ooxml_element(element=child, depth=depth+1) for child in element]
 		)
 
