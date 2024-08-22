@@ -1,12 +1,11 @@
 from __future__ import annotations
+from typing import Optional, Literal
 
-import os
 import re
 import zipfile
 from io import BytesIO
 
-from typing import Optional, Literal
-
+# LXML
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
@@ -26,13 +25,13 @@ class OoxmlPart:
 		self.name: str
 		self.extension: Literal[".xml", ".rels"]
 
-		self.name, self.extension = self._get_name_and_extension_from_docx_file_name(
+		self.name, self.extension = self._get_name_and_extension_from_part_file_name(
 			docx_file_content_element["name_tail"]
 		)
 		self.element: etreeElement = etree.fromstring(docx_file_content_element["content"])
 
 	@staticmethod
-	def _get_name_and_extension_from_docx_file_name(name_tail: str) -> tuple[str, str]:
+	def _get_name_and_extension_from_part_file_name(name_tail: str) -> tuple[str, str]:
 		"""
 		Extracts the name and extension from the .docx part file name.
 
@@ -40,7 +39,7 @@ class OoxmlPart:
 		:return: A tuple containing the name and extension of the file.
 		"""
 
-		regex_result = re.match(r"(.+)(\.[^.]+$)", name_tail)
+		regex_result = re.match(r"(.+)(\.[^.]+$)", name_tail)  #
 		return regex_result.groups() if regex_result is not None else ("", name_tail)
 
 	def __str__(self) -> str:
@@ -102,6 +101,7 @@ class OoxmlPackage:
 				"content": docx_file_content_element["content"]
 			}
 
+			#
 			if f_name_head in package_content.keys():
 				package_content[f_name_head].append(package_content_element)
 			else:
@@ -192,7 +192,8 @@ class OoxmlDocx:
 		with open(self.docx_file_path, "rb") as f:
 			with zipfile.ZipFile(BytesIO(f.read())) as zip_ref:
 				for f_name in zip_ref.namelist():
-					if f_name.endswith("xml") or f_name.endswith(".rels"):  # TODO: handle other file extensions
+					# TODO: handle other file extensions inside the package
+					if f_name.endswith("xml") or f_name.endswith(".rels"):
 						# Divide the file name by the first '/' character
 						f_name_head, f_name_tail = (f_name.split("/", maxsplit=1) + [""])[:2]
 						docx_file_content_element = {
