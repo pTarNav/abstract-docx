@@ -202,13 +202,13 @@ class OoxmlDocxStyleTree(ArbitraryBaseModel):
 	# OOXML Styles element root styles.
 	# Note that it avoids using a mutable default list which can lead to unintended behavior,
 	# using pydantic list field generator instead.
-	character_root_style: list[CharacterStyle] = Field(default_factory=list)
-	paragraph_root_style: list[ParagraphStyle] = Field(default_factory=list)
-	table_root_style: list[TableStyle] = Field(default_factory=list)
+	character_root_styles: list[CharacterStyle] = Field(default_factory=list)
+	paragraph_root_styles: list[ParagraphStyle] = Field(default_factory=list)
+	table_root_styles: list[TableStyle] = Field(default_factory=list)
 
 	# Save metadata information as well as elements that are not explicitly parsed
 	element_skeleton: etreeElement
-	skipped_elements: list[etreeElement] = Field(default_factory=list) # mainly numbering styles
+	skipped_elements: Optional[list[etreeElement]] = None # mainly numbering styles
 
 
 class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
@@ -223,17 +223,22 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 
 		
 		"""
-		print("docDefaults")
-		print(self._parse_doc_defaults())
-
-		print("latentStyles")
-		print(self._parse_latent_styles())
-
-		print("styles")
-		print(self._compute_style_trees())
+		
+		default_style: DefaultStyle = self._parse_doc_defaults()
+		latent_styles: LatentStyles = self._parse_latent_styles()
+		character_root_styles, paragraph_root_styles, table_root_styles = self._compute_style_trees()
 
 		return OoxmlDocxStyleTree(
-			element_skeleton=element_skeleton(self.ooxml_styles_part_element)
+			default_style=default_style,
+			latent_styles=latent_styles,
+			character_root_styles=character_root_styles,
+			paragraph_root_styles=paragraph_root_styles,
+			table_root_styles=table_root_styles,
+			element_skeleton=element_skeleton(self.ooxml_styles_part_element),
+			skipped_elements=xpath_query(
+				element=self.ooxml_styles_part_element,
+				query="./*[not(self::w:docDefaults or self::w:latentStyles or (self::w:style and (@type='character' or @type='paragraph' or @type='table')))]"
+			)
 		)
 	
 	def _parse_doc_defaults(self) -> Optional[DefaultStyle]:
@@ -287,7 +292,7 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 			element=self.ooxml_styles_part_element, query="./w:style[@w:type='character']"
 		)
 		if character_styles is not None:
-			character_style_roots = self._compute_style_tree(
+			character_root_styles = self._compute_style_tree(
 				styles=character_styles, styles_type="character"
 			)
 		
@@ -295,7 +300,7 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 			element=self.ooxml_styles_part_element, query="./w:style[@w:type='paragraph']"
 		)
 		if paragraph_styles is not None:
-			paragraph_style_roots = self._compute_style_tree(
+			paragraph_root_styles = self._compute_style_tree(
 				styles=paragraph_styles, styles_type="paragraph"
 			)
 		
@@ -303,11 +308,11 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 			element=self.ooxml_styles_part_element, query="./w:style[@w:type='table']"
 		)
 		if table_styles is not None:
-			table_style_roots = self._compute_style_tree(
+			table_root_styles = self._compute_style_tree(
 				styles=table_styles, styles_type="table"
 			)
 		
-		return None, None, None
+		return character_root_styles, paragraph_root_styles, table_root_styles
 
 	def _compute_style_tree(self, styles: list[etreeElement], styles_type: Literal["character", "paragraph", "table"]) -> list[Style]:
 		"""_summary_
@@ -388,6 +393,23 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 					element_skeleton=paragraph_style_parse["element_skeleton"],
 					skipped_elements=paragraph_style_parse["skipped_elements"]
 				)
+			case "table":
+				table_style_parse: dict[str, etreeElement | list[etreeElement]] = self._parse_table_style_information(
+					table_style=style
+				)
+				_style: TableStyle = TableStyle(
+					id=id, name=name,
+					properties=tblPr(element=table_style_parse["tblPr"])
+					if table_style_parse["tblPr"] is not None else None,
+					conditional_properties=tblStylePr(element=table_style_parse["tblStylePr"])
+					if table_style_parse["tblStylePr"] is not None else None,
+					row_properties=trPr(element=table_style_parse["trPr"])
+					if table_style_parse["trPr"] is not None else None,
+					cell_properties=tcPr(element=table_style_parse["tcPr"])
+					if table_style_parse["tcPr"] is not None else None,
+					element_skeleton=table_style_parse["element_skeleton"],
+					skipped_elements=table_style_parse["skipped_elements"]
+				)
 			case _:
 				raise ValueError(f"'styles_type'={styles_type} can only be string literal ('character', 'paragraph' or 'table')")
 
@@ -427,9 +449,23 @@ class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):
 				query="./*[not(self::w:name or self::w:basedOn or self::w:pPr or self::w:rPr)]"
 			)
 		}
+	
+	def _parse_table_style_information(self, table_style: etreeElement) -> dict[str, etreeElement | list[etreeElement]]:
+		"""_summary_
 
-if __name__ == "__main__":
-	from ooxml_docx.ooxml_docx import OoxmlDocx
-	a = OoxmlDocx(docx_file_path="test/cp2022_10a01.docx")
-	x = OoxmlDocxStyleTreeInterface(ooxml_styles_part_element=a.word.parts["styles.xml"].element)
-	x.style_tree
+		:param table_style: _description_
+		:return: _description_
+		"""
+
+		return {
+			"tblPr": xpath_query(element=table_style, query="./w:tblPr", singleton=True),
+			"tblStylePr": xpath_query(element=table_style, query="./w:tblStylePr", singleton=True),
+			"trPr": xpath_query(element=table_style, query="./w:trPr", singleton=True),
+			"tcPr": xpath_query(element=table_style, query="./w:tcPr", singleton=True),
+			"element_skeleton": element_skeleton(element=table_style),
+			# Capture any other child element
+			"skipped_elements": xpath_query(
+				element=table_style,
+				query="./*[not(self::w:name or self::w:basedOn or self::w:tblPr or self::w:tblStylePr or self::w:trPr or self::w:tcPr)]"
+			)
+		}

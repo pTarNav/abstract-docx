@@ -10,7 +10,7 @@ def print_etree(element: etreeElement) -> None:
     Prints XML element using LXML etree.tostring and decoding to utf-8
     :param element: XML element.
     """
-    print(etree.tostring(element, pretty_print=True).decode("utf-8"))
+    print(etree.tostring(element, pretty_print=True, encoding="utf-8").decode("utf-8"))
 
 
 def local_name(element: etreeElement) -> str:
