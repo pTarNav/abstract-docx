@@ -40,7 +40,8 @@ class OoxmlPart:
 		return regex_result.groups() if regex_result is not None else ("", name_tail)
 
 	def __str__(self) -> str:
-		s = f"{{ '{self.name}' ({self.extension}) }}:\n"
+		s = f"\U0001F4C4 '{self.name}{self.extension}'\n"
+		etree.indent(tree=self.element, space="\t")
 		s += etree.tostring(self.element, pretty_print=True, encoding="utf8").decode("utf8")
 		return s
 
@@ -131,19 +132,56 @@ class OoxmlPackage:
 	def __str__(self) -> str:
 		return self._custom_str()
 
-	def _custom_str(self, depth: int = 0) -> str:
-		s = f"{chr(9)*(depth-1) + ' '*(depth-1) + chr(9492) + '--> ' if depth > 0 else ''}[ '{self.name}' ]: "
+	def _custom_str(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		"""_summary_
+
+		:param depth: _description_, defaults to 0
+		:param last: _description_, defaults to False
+		:param line_state: _description_, defaults to None
+		:return: _description_
+		"""
+		if line_state is None:
+			line_state = []
+		
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502   " if level_state else "    "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+
+		s = f"{arrow}[ {self.name} ]: "
 		s += f"(n.parts={len(self.parts)}, n.packages={len(self.packages) if self.packages is not None else 0}, "
 		s += f"_rels?={'y' if self._rels is not None else 'n'})\n"
 
+		# Update the line state for the current depth
+		if depth >= len(line_state):
+			line_state.append(not last)
+		else:
+			line_state[depth] = not last
+
 		# Sort parts names alphanumerically
-		for part in sorted(self.parts.keys(), key=lambda x: (
+		sorted_parts = sorted(self.parts.keys(), key=lambda x: (
 				re.sub(r'[^a-zA-Z]+', '', x),
 				int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
-		)):
-			s += f"{chr(9)*depth + ' '*depth}\u2514--> {{ {part} }}\n"
+		))
+
+		for i, part in enumerate(sorted_parts):
+			prefix = " "
+			for level_state in line_state:
+				prefix += "\u2502   " if level_state else "    "
+			arrow = prefix + (
+				"\u2514\u2500\u2500\u25BA" if (i == len(sorted_parts)-1 and self.packages is None)
+				else "\u251c\u2500\u2500\u25BA"
+			)
+			s += f"{arrow}{{ {part} }}\n"
+		
 		if self.packages is not None:
-			for package in sorted(self.packages.values(), key=lambda x: x.name):
-				s += package._custom_str(depth=depth+1)
+			sorted_packages = sorted(self.packages.values(), key=lambda x: x.name)
+			for i, package in enumerate(sorted_packages):
+				s += package._custom_str(
+					depth=depth+1, last=i==len(sorted_packages)-1, line_state=line_state
+				)
 
 		return s

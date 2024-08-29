@@ -92,13 +92,11 @@ class OoxmlDocx:
 					raise KeyError(f"Match not found for root .docx package/part {f_name}.")
 
 	def __str__(self):
-		s = f"<< {self.docx_file_path} >> "
-		s += f"([Content_Types]?={'y' if self._content_types is not None else 'n'}, "
-		s += f"_rels?={'y' if self._rels is not None else 'n'})\n"
+		s = f"\U0001F4C4 '{self.docx_file_path}'\n"
 
 		s += self.word._custom_str(depth=1)
-		s += self.doc_props._custom_str(depth=1)
+		s += self.doc_props._custom_str(depth=1, last=self.custom_xml is None)
 		if self.custom_xml is not None:
-			s += self.custom_xml._custom_str(depth=1)
+			s += self.custom_xml._custom_str(depth=1, last=True)
 
 		return s
