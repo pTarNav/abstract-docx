@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator, field_validator, computed_field
 from typing import Optional, Literal, Any
+import re
 
 # LXML
 from lxml import etree
@@ -12,13 +13,29 @@ from utils.etree_element_aux import print_etree, local_name, element_skeleton, x
 
 
 class ArbitraryBaseModel(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+	"""
+	Auxiliary BaseModel class to avoid serialization error with etreeElement attributes.
+	:param BaseModel: pydantic BaseModel
+	"""
+
+	class Config:
+		arbitrary_types_allowed = True
+
+
+class StyleProperties(ArbitraryBaseModel):
+	"""
+	Represents a .docx style properties element.
+	"""
+	element: etreeElement
+
+	def __str__(self):
+		etree.indent(tree=self.element, space="\t")
+		return etree.tostring(self.element, pretty_print=True, encoding="utf8").decode("utf8")
 
 
 class Style(ArbitraryBaseModel):
 	"""
-	Represents a .docx style element
+	Represents a .docx style element.
 	"""
 	id: str
 	name: Optional[str] = None
@@ -29,9 +46,110 @@ class Style(ArbitraryBaseModel):
 	element_skeleton: etreeElement
 	skipped_elements: Optional[list[etreeElement]] = None
 
+	def __str__(self) -> str:
+		return self._custom_str()
 
-class rPr(ArbitraryBaseModel):
-	element: Optional[etreeElement]
+	def _custom_str(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		"""
+		Computes string representation of a .docx style.
+
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Style is the last one from the parent children list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection
+		 for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Style string representation.
+		"""
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of style header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		s = f"{arrow}\U0001F33F '{self.id}' ("
+
+		if isinstance(self, CharacterStyle):
+			s += self._character_style_header_str()
+		if isinstance(self, ParagraphStyle):
+			s += self._paragraph_style_header_str()
+		if isinstance(self, TableStyle):
+			s += self._table_style_header_str()
+
+		s += ")\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of child styles
+		if self.children is not None:
+			prefix = " "
+			for level_state in line_state:
+				prefix += "\u2502    " if level_state else "     "
+			# Sort child styles ids
+			sorted_children = self.children
+			for i, child in enumerate(sorted_children):
+				arrow = prefix + (
+					"\u2514\u2500\u2500\u25BA" if i == len(sorted_children)-1 
+					else "\u251c\u2500\u2500\u25BA"
+				)
+				s += child._custom_str(
+					depth=depth+1, last=i==len(sorted_children)-1,
+					line_state=line_state[:]  # Pass-by-value
+				)
+		
+		return s
+
+	def _character_style_header_str(self) -> str:
+		"""_summary_
+		:return: _description_
+		"""
+
+		s = "type='character', "
+		s += f"name='{self.name}', " if self.name is not None else ""
+		s += f"n.children={len(self.children) if self.children is not None else 0}, "
+		s += f"<rPr>?={'y' if self.properties is not None else 'n'}"
+
+		return s
+	
+	def _paragraph_style_header_str(self) -> str:
+		"""_summary_
+		:return: _description_
+		"""
+
+		s = "type='paragraph', "
+		s += f"name='{self.name}', " if self.name is not None else ""
+		s += f"n.children={len(self.children) if self.children is not None else 0}, "
+		s += f"<pPr>?={'y' if self.properties is not None else 'n'}, "
+		s += f"<rPr>?={'y' if self.character_properties is not None else 'n'}"
+
+		return s
+	
+	def _table_style_header_str(self) -> str:
+		"""_summary_
+		:return: _description_
+		"""
+
+		s = "type='table', "
+		s += f"name='{self.name}', " if self.name is not None else ""
+		s += f"n.children={len(self.children) if self.children is not None else 0}, "
+		s += f"<tblPr>?={'y' if self.properties is not None else 'n'}, "
+		s += f"<tblStylePr>?={'y' if self.conditional_properties is not None else 'n'}, "
+		s += f"<trPr>?={'y' if self.row_properties is not None else 'n'}, "
+		s += f"<tcPr>?={'y' if self.cell_properties is not None else 'n'}"
+
+		return s
+
+class rPr(StyleProperties):
+	element: etreeElement
 
 	@field_validator('element')
 	def check_tag(cls, value: Any) -> Any:
@@ -47,16 +165,8 @@ class CharacterStyle(Style):
 	"""
 	properties: Optional[rPr] = None
 
-	@model_validator(mode="before")
-	def property_required(cls, values: dict[str, Any]) -> dict[str, Any]:
-		if values.get("properties") is None:
-			print(
-				"<CharacterStyle> does not include 'properties' (<rPr>)",
-			)
-		return values
 
-
-class pPr(ArbitraryBaseModel):
+class pPr(StyleProperties):
 	element: etreeElement
 
 	@field_validator('element')
@@ -74,18 +184,8 @@ class ParagraphStyle(Style):
 	properties: Optional[pPr] = None
 	character_properties: Optional[rPr] = None
 
-	@model_validator(mode="before")
-	def property_required(cls, values: dict[str, Any]) -> dict[str, Any]:
-		if not any(values.get(attr) is not None for attr 
-			in ("properties", "character_properties")
-		):
-			print(
-				"<ParagraphStyle> does not include neither 'properties' (<pPr>) nor 'character_properties' (<rPr>)",
-			)
-		return values
 
-
-class tblPr(ArbitraryBaseModel):
+class tblPr(StyleProperties):
 	element: etreeElement
 
 	@field_validator('element')
@@ -95,7 +195,7 @@ class tblPr(ArbitraryBaseModel):
 		return value
 
 
-class tblStylePr(ArbitraryBaseModel):
+class tblStylePr(StyleProperties):
 	element: etreeElement
 
 	@field_validator('element')
@@ -105,7 +205,7 @@ class tblStylePr(ArbitraryBaseModel):
 		return value
 
 
-class trPr(ArbitraryBaseModel):
+class trPr(StyleProperties):
 	element: etreeElement
 
 	@field_validator('element')
@@ -115,7 +215,7 @@ class trPr(ArbitraryBaseModel):
 		return value
 
 
-class tcPr(ArbitraryBaseModel):
+class tcPr(StyleProperties):
 	element: etreeElement
 
 	@field_validator('element')
@@ -136,16 +236,6 @@ class TableStyle(Style):
 	row_properties: Optional[trPr] = None
 	cell_properties: Optional[tcPr] = None
 
-	@model_validator(mode="before")
-	def property_required(cls, values: dict[str, Any]) -> dict[str, Any]:
-		if not any(values.get(attr) is not None for attr 
-			in ("properties", "conditional_properties", "row_properties", "cell_properties")
-		):
-			print(
-				"<TableStyle> does not include neither 'properties', 'conditional_properties', 'row_properties' nor 'cell_properties'"
-			)
-		return values
-
 
 class DefaultStyle(Style):
 	"""
@@ -162,7 +252,6 @@ class DefaultStyle(Style):
 		):
 			raise ValueError("<DefaultStyle> must at least include either 'default_paragraph_properties' (<pPr>) or 'default_character_properties' (<rPr>)")
 		return values
-
 
 class LatentStyles(ArbitraryBaseModel):
 	"""
@@ -209,6 +298,61 @@ class OoxmlDocxStyleTree(ArbitraryBaseModel):
 	# Save metadata information as well as elements that are not explicitly parsed
 	element_skeleton: etreeElement
 	skipped_elements: Optional[list[etreeElement]] = None # mainly numbering styles
+
+	def __str__(self) -> str:
+		s = "\U0001F333 'Style Tree' ("
+		s += f"docDefaults={'y' if self.default_style is not None else 'n'}, "
+		s += f"latentStyles={'y' if self.latent_styles is not None else 'n'}"
+		s += ")\n"
+		
+		if len(self.character_root_styles) > 0:
+			# Character root styles header
+			empty_paragraph_and_table_root_styles = (
+				(len(self.paragraph_root_styles) == 0) and (len(self.table_root_styles) == 0)
+			)
+
+			arrow = (" \u2514\u2500\u2500\u25BA" if empty_paragraph_and_table_root_styles else " \u251c\u2500\u2500\u25BA")
+			s += f"{arrow}\U0001F331 'Character Style Tree' ("
+			s += f"n.roots={len(self.character_root_styles)}"
+			s += ")\n"
+
+			# Compute string representation for each character root style
+			for i, character_style_root in enumerate(self.character_root_styles):
+				s += character_style_root._custom_str(
+					depth=3, last=i==len(self.character_root_styles)-1,
+					line_state=[not empty_paragraph_and_table_root_styles]
+				)
+		
+		if len(self.paragraph_root_styles) > 0:
+			# Paragraph root styles header
+			empty_table_root_styles = len(self.table_root_styles) == 0
+
+			arrow = (" \u2514\u2500\u2500\u25BA" if empty_table_root_styles else " \u251c\u2500\u2500\u25BA")
+			s += f"{arrow}\U0001F331 'Paragraph Style Tree' ("
+			s += f"n.roots={len(self.paragraph_root_styles)}"
+			s += ")\n"
+			
+			# Compute string representation for each paragraph root style
+			for i, paragraph_style_root in enumerate(self.paragraph_root_styles):
+				s += paragraph_style_root._custom_str(
+					depth=3, last=i==len(self.paragraph_root_styles)-1,
+					line_state=[not empty_table_root_styles]
+				)
+
+		if len(self.table_root_styles) > 0:
+			# Table root styles header
+
+			s += " \u2514\u2500\u2500\u25BA\U0001F331 'Table Style Tree' ("
+			s += f"n.roots={len(self.table_root_styles)}"
+			s += ")\n"
+
+			# Compute string representation for each table root style
+			for i, table_style_root in enumerate(self.table_root_styles):
+				s += table_style_root._custom_str(
+					depth=2, last=i==len(self.table_root_styles)-1, line_state=[False]
+				)
+		
+		return s
 
 
 class OoxmlDocxStyleTreeInterface(ArbitraryBaseModel):

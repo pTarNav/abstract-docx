@@ -17,7 +17,7 @@ class OoxmlPart:
 		Initializes an OOXML part with the content of a OOXML file part.
 
 		:param ooxml_file_content_element: A dictionary containing 'name_tail' and 'content' keys,
-		representing the file name and its content.
+		 representing the file name and its content.
 		"""
 		self.name: str
 		self.extension: Literal[".xml", ".rels"]
@@ -48,9 +48,10 @@ class OoxmlPart:
 
 class OoxmlPackage:
 	"""
-	Represents an OOXML (Office Open XML) package, which can contain multiple parts
-	and nested packages. It processes the content of a OOXML file to organize and
-	manage these parts and packages.
+	Represents an OOXML (Office Open XML) package,
+	 which can contain multiple parts and nested packages.
+	
+	It processes the content of an OOXML file to organize and manage these parts and packages.
 	"""
 
 	def __init__(self, name: str, ooxml_file_content: list) -> None:
@@ -59,7 +60,7 @@ class OoxmlPackage:
 
 		:param name: The name of the OOXML package.
 		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		where each dictionary contains 'name_tail' and 'content' keys.
+		 where each dictionary contains 'name_tail' and 'content' keys.
 		"""
 		self.name = name
 		self.parts: dict[str, OoxmlPart] = {}
@@ -73,9 +74,8 @@ class OoxmlPackage:
 		Loads and processes the content of the OOXML file into the package.
 
 		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		where each dictionary contains 'name_tail' and 'content' keys.
+		 where each dictionary contains 'name_tail' and 'content' keys.
 		"""
-
 		package_content = self._prepare_package_content(ooxml_file_content=ooxml_file_content)
 		self._process_package_content(package_content=package_content)
 
@@ -85,11 +85,10 @@ class OoxmlPackage:
 		Prepares the package content by organizing OOXML file content into a structured dictionary.
 
 		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		where each dictionary contains 'name_tail' and 'content' keys.
-		:return: A dictionary where the keys are the main part names and the values are lists of
-		content elements.
+		 where each dictionary contains 'name_tail' and 'content' keys.
+		:return: A dictionary where the keys are the main part names
+		 and the values are lists of content elements.
 		"""
-
 		package_content = {}
 		for ooxml_file_content_element in ooxml_file_content:
 			# Divide the file name by the first '/' character
@@ -99,7 +98,7 @@ class OoxmlPackage:
 				"content": ooxml_file_content_element["content"]
 			}
 
-			#
+			# Load into structured dictionary based on if the file name head has been initialized
 			if f_name_head in package_content.keys():
 				package_content[f_name_head].append(package_content_element)
 			else:
@@ -112,9 +111,8 @@ class OoxmlPackage:
 		Processes the prepared package content, organizing it into parts and nested packages.
 
 		:param package_content: A dictionary where the keys are the main part names and the values
-		are lists of content elements.
+		 are lists of content elements.
 		"""
-
 		for f_name, f_content in package_content.items():
 			if len(f_content) > 1 or f_name != f_content[0]["name_tail"]:
 				# Process OoxmlPackage
@@ -133,33 +131,39 @@ class OoxmlPackage:
 		return self._custom_str()
 
 	def _custom_str(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""_summary_
+		"""
+		Computes string representation of a package.
 
-		:param depth: _description_, defaults to 0
-		:param last: _description_, defaults to False
-		:param line_state: _description_, defaults to None
-		:return: _description_
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Package is the last one from the parent packages list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection
+		 for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Package string representation.
 		"""
 		if line_state is None:
 			line_state = []
 		
-		prefix = " "
+		# Compute string representation of package header
+		prefix = " " if depth > 0 else ""
 		for level_state in line_state:
-			prefix += "\u2502   " if level_state else "    "
+			prefix += "\u2502    " if level_state else "     "
 		arrow = prefix + (
 			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
 			if depth > 0 else ""
 		)
-
-		s = f"{arrow}[ {self.name} ]: "
-		s += f"(n.parts={len(self.parts)}, n.packages={len(self.packages) if self.packages is not None else 0}, "
-		s += f"_rels?={'y' if self._rels is not None else 'n'})\n"
+		s = f"{arrow}\U0001F4C1 '{self.name}' ("
+		s += f"n.parts={len(self.parts)}, "
+		s += f"n.packages={len(self.packages) if self.packages is not None else 0}, "
+		s += f"_rels?={'y' if self._rels is not None else 'n'}"
+		s += ")\n"
 
 		# Update the line state for the current depth
-		if depth >= len(line_state):
-			line_state.append(not last)
-		else:
-			line_state[depth] = not last
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
 
 		# Sort parts names alphanumerically
 		sorted_parts = sorted(self.parts.keys(), key=lambda x: (
@@ -167,21 +171,25 @@ class OoxmlPackage:
 				int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
 		))
 
+		# Compute string representation of child parts
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
 		for i, part in enumerate(sorted_parts):
-			prefix = " "
-			for level_state in line_state:
-				prefix += "\u2502   " if level_state else "    "
 			arrow = prefix + (
 				"\u2514\u2500\u2500\u25BA" if (i == len(sorted_parts)-1 and self.packages is None)
 				else "\u251c\u2500\u2500\u25BA"
 			)
-			s += f"{arrow}{{ {part} }}\n"
+			s += f"{arrow}\U0001F4C4 '{part}'\n"
 		
+		# Compute string representation of child packages
 		if self.packages is not None:
+			# Sort packages names
 			sorted_packages = sorted(self.packages.values(), key=lambda x: x.name)
 			for i, package in enumerate(sorted_packages):
 				s += package._custom_str(
-					depth=depth+1, last=i==len(sorted_packages)-1, line_state=line_state
+					depth=depth+1, last=i==len(sorted_packages)-1,
+					line_state=line_state[:]  # Pass-by-value
 				)
 
 		return s
