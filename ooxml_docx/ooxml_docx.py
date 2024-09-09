@@ -92,7 +92,7 @@ class OoxmlDocx:
 					raise KeyError(f"Match not found for root .docx package/part {f_name}.")
 
 	def __str__(self):
-		s = f"\U0001F4D1 '{self.docx_file_path}'\n"
+		s = f"\U0001F4D1 \033[36m\033[1m'{self.docx_file_path}'\033[0m\n"
 
 		s += self.word._custom_str(depth=1)
 		s += self.doc_props._custom_str(depth=1, last=self.custom_xml is None)

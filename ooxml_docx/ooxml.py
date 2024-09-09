@@ -7,6 +7,7 @@ import re
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
+
 class OoxmlPart:
 	"""
 	Represents an OOXML (Office Open XML) part, which is a component of an OOXML package.
