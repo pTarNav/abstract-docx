@@ -2,43 +2,32 @@ from __future__ import annotations
 from typing import Optional, Literal
 
 import re
+from pathlib import Path
 
 # LXML
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
+from utils.pydantic import ArbitraryBaseModel
 
-class OoxmlPart:
+
+class OoxmlPart(ArbitraryBaseModel):
 	"""
 	Represents an OOXML (Office Open XML) part, which is a component of an OOXML package.
 	"""
+	name: str
+	element: etreeElement
 
-	def __init__(self, ooxml_file_content_element: dict) -> None:
+	@classmethod
+	def load(cls, name: str, content: str) -> OoxmlPart:
 		"""
 		Initializes an OOXML part with the content of a OOXML file part.
 
-		:param ooxml_file_content_element: A dictionary containing 'name_tail' and 'content' keys,
-		 representing the file name and its content.
-		"""
-		self.name: str
-		self.extension: Literal[".xml", ".rels"]
-
-		self.name, self.extension = self._get_name_and_extension_from_part_file_name(
-			ooxml_file_content_element["name_tail"]
-		)
-		self.element: etreeElement = etree.fromstring(ooxml_file_content_element["content"])
-
-	@staticmethod
-	def _get_name_and_extension_from_part_file_name(name_tail: str) -> tuple[str, str]:
-		"""
-		Extracts the name and extension from the OOXML part file name.
-
-		:param name_tail: The file name string to extract the name and extension from.
-		:return: A tuple containing the name and extension of the file.
+		:param name:
+		:param content: 
 		"""
 
-		regex_result = re.match(r"(.+)(\.[^.]+$)", name_tail)  #
-		return regex_result.groups() if regex_result is not None else ("", name_tail)
+		return cls(name=name, element=etree.fromstring(content))
 
 	def __str__(self) -> str:
 		s = f"\U0001F4C4 '{self.name}{self.extension}'\n"
@@ -47,91 +36,50 @@ class OoxmlPart:
 		return s
 
 
-class OoxmlPackage:
+class OoxmlPackage(ArbitraryBaseModel):
 	"""
 	Represents an OOXML (Office Open XML) package,
 	 which can contain multiple parts and nested packages.
 	
 	It processes the content of an OOXML file to organize and manage these parts and packages.
 	"""
+	name: str
+	parts: dict[str, OoxmlPart] = {}
+	packages: dict[str, OoxmlPackage] = {}
+	_rels: Optional[str] = None
 
-	def __init__(self, name: str, ooxml_file_content: list) -> None:
+	@classmethod
+	def load(cls, name: str, contents: dict[str, str]) -> OoxmlPackage:
 		"""
-		Initializes an OOXML package with a given name and OOXML file content.
+		Initializes an OOXML package with a given name and contents.
 
 		:param name: The name of the OOXML package.
-		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		 where each dictionary contains 'name_tail' and 'content' keys.
+		:param contents: 		
 		"""
-		self.name = name
-		self.parts: dict[str, OoxmlPart] = {}
-		self.packages: Optional[dict[str, OoxmlPackage]] = None
-		self._rels: Optional[OoxmlPackage] = None
+		parts = {}
+		packages = {}
 
-		self._load_package_content(ooxml_file_content=ooxml_file_content)
-
-	def _load_package_content(self, ooxml_file_content: list) -> None:
-		"""
-		Loads and processes the content of the OOXML file into the package.
-
-		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		 where each dictionary contains 'name_tail' and 'content' keys.
-		"""
-		package_content = self._prepare_package_content(ooxml_file_content=ooxml_file_content)
-		self._process_package_content(package_content=package_content)
-
-	@staticmethod
-	def _prepare_package_content(ooxml_file_content: list) -> dict:
-		"""
-		Prepares the package content by organizing OOXML file content into a structured dictionary.
-
-		:param ooxml_file_content: The content of the OOXML file represented as a list of dictionaries,
-		 where each dictionary contains 'name_tail' and 'content' keys.
-		:return: A dictionary where the keys are the main part names
-		 and the values are lists of content elements.
-		"""
-		package_content = {}
-		for ooxml_file_content_element in ooxml_file_content:
-			# Divide the file name by the first '/' character
-			f_name_head, f_name_tail = (ooxml_file_content_element["name_tail"].split("/", maxsplit=1) + [""])[:2]
-			package_content_element = {
-				"name_tail": f_name_tail if f_name_tail != "" else f_name_head,
-				"content": ooxml_file_content_element["content"]
-			}
-
-			# Load into structured dictionary based on if the file name head has been initialized
-			if f_name_head in package_content.keys():
-				package_content[f_name_head].append(package_content_element)
-			else:
-				package_content[f_name_head] = [package_content_element]
-
-		return package_content
-
-	def _process_package_content(self, package_content: dict) -> None:
-		"""
-		Processes the prepared package content, organizing it into parts and nested packages.
-
-		:param package_content: A dictionary where the keys are the main part names and the values
-		 are lists of content elements.
-		"""
-		for f_name, f_content in package_content.items():
-			if len(f_content) > 1 or f_name != f_content[0]["name_tail"]:
-				# Process OoxmlPackage
-				match f_name:
-					case "_rels":
-						self._rels = OoxmlPackage(name=f_name, ooxml_file_content=f_content)
-					case _:
-						if self.packages is None:  # Initialize packages dict
-							self.packages = {}
-						self.packages[f_name] = OoxmlPackage(name=f_name, ooxml_file_content=f_content)
-			else:
-				# Process OoxmlPart
-				self.parts[f_name] = OoxmlPart(ooxml_file_content_element=f_content[0])
+		_packages: dict[str, dict[str, str]] = {}
+		for _name, content in contents.items():
+			name_split = _name.split("/")
+			
+			if len(name_split) == 1:
+				parts[Path(_name).stem] = OoxmlPart.load(name=Path(_name).stem, content=content)
+				continue
+			
+			if name_split[0] not in _packages.keys():
+				_packages[name_split[0]] = {}
+			_packages[name_split[0]]["/".join(name_split[1:])] = content
+		
+		for _name, contents in _packages.items():
+			packages[_name] = OoxmlPackage.load(name=_name, contents=contents)
+		
+		return cls(name=name, parts=parts, packages=packages)
 
 	def __str__(self) -> str:
-		return self._custom_str()
+		return self._custom_str_()
 
-	def _custom_str(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+	def _custom_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
 		"""
 		Computes string representation of a package.
 
@@ -178,7 +126,7 @@ class OoxmlPackage:
 			prefix += "\u2502    " if level_state else "     "
 		for i, part in enumerate(sorted_parts):
 			arrow = prefix + (
-				"\u2514\u2500\u2500\u25BA" if (i == len(sorted_parts)-1 and self.packages is None)
+				"\u2514\u2500\u2500\u25BA" if (i == len(sorted_parts)-1 and len(self.packages) == 0)
 				else "\u251c\u2500\u2500\u25BA"
 			)
 			s += f"{arrow}\U0001F4C4 '{part}'\n"
@@ -188,7 +136,7 @@ class OoxmlPackage:
 			# Sort packages names
 			sorted_packages = sorted(self.packages.values(), key=lambda x: x.name)
 			for i, package in enumerate(sorted_packages):
-				s += package._custom_str(
+				s += package._custom_str_(
 					depth=depth+1, last=i==len(sorted_packages)-1,
 					line_state=line_state[:]  # Pass-by-value
 				)
