@@ -1,8 +1,8 @@
 from __future__ import annotations
+from pydantic import Field
 from typing import Optional, Literal
 
 import re
-from pathlib import Path
 
 # LXML
 from lxml import etree
@@ -26,11 +26,10 @@ class OoxmlPart(ArbitraryBaseModel):
 		:param name:
 		:param content: 
 		"""
-
 		return cls(name=name, element=etree.fromstring(content))
 
 	def __str__(self) -> str:
-		s = f"\U0001F4C4 '{self.name}{self.extension}'\n"
+		s = f"\U0001F4C4 '{self.name}'\n"
 		etree.indent(tree=self.element, space="\t")
 		s += etree.tostring(self.element, pretty_print=True, encoding="utf8").decode("utf8")
 		return s
@@ -44,9 +43,13 @@ class OoxmlPackage(ArbitraryBaseModel):
 	It processes the content of an OOXML file to organize and manage these parts and packages.
 	"""
 	name: str
-	parts: dict[str, OoxmlPart] = {}
-	packages: dict[str, OoxmlPackage] = {}
-	_rels: Optional[str] = None
+
+	# Note that it avoids using a mutable default dictionary which can lead to unintended behavior,
+	# using pydantic dictionary field generator instead.
+	parts: dict[str, OoxmlPart] = Field(default_factory=dict)
+	packages: dict[str, OoxmlPackage] = Field(default_factory=dict)
+
+	relationships: Optional[OoxmlPackage] = None
 
 	@classmethod
 	def load(cls, name: str, contents: dict[str, str]) -> OoxmlPackage:
@@ -58,23 +61,30 @@ class OoxmlPackage(ArbitraryBaseModel):
 		"""
 		parts = {}
 		packages = {}
+		_rels = None
 
 		_packages: dict[str, dict[str, str]] = {}
 		for _name, content in contents.items():
 			name_split = _name.split("/")
 			
+			#
 			if len(name_split) == 1:
-				parts[Path(_name).stem] = OoxmlPart.load(name=Path(_name).stem, content=content)
+				parts[_name] = OoxmlPart.load(name=_name, content=content)
 				continue
 			
+			#
 			if name_split[0] not in _packages.keys():
 				_packages[name_split[0]] = {}
 			_packages[name_split[0]]["/".join(name_split[1:])] = content
 		
+		#
 		for _name, contents in _packages.items():
-			packages[_name] = OoxmlPackage.load(name=_name, contents=contents)
+			if _name == "_rels":
+				_rels = OoxmlPackage.load(name="_rels", contents=contents)
+			else:
+				packages[_name] = OoxmlPackage.load(name=_name, contents=contents)
 		
-		return cls(name=name, parts=parts, packages=packages)
+		return cls(name=name, parts=parts, packages=packages, relationships=_rels)
 
 	def __str__(self) -> str:
 		return self._custom_str_()
@@ -101,11 +111,16 @@ class OoxmlPackage(ArbitraryBaseModel):
 			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
 			if depth > 0 else ""
 		)
-		s = f"{arrow}\U0001F4C1 '{self.name}' ("
-		s += f"n.parts={len(self.parts)}, "
-		s += f"n.packages={len(self.packages) if self.packages is not None else 0}, "
-		s += f"_rels?={'y' if self._rels is not None else 'n'}"
-		s += ")\n"
+		if self.name != "_rels":
+			s = f"{arrow}\U0001F4C1 '{self.name}'"
+			
+			# Compute string representation of package metadata
+			s += "("
+			s += f"n.parts={len(self.parts)}, "
+			s += f"n.packages={len(self.packages) if self.packages is not None else 0}"
+			s += ")\n"
+		else:
+			s = f"{arrow}\u26D3 \U0001F4C1 '_rels'\n"
 
 		# Update the line state for the current depth
 		if depth > 0:
@@ -126,19 +141,31 @@ class OoxmlPackage(ArbitraryBaseModel):
 			prefix += "\u2502    " if level_state else "     "
 		for i, part in enumerate(sorted_parts):
 			arrow = prefix + (
-				"\u2514\u2500\u2500\u25BA" if (i == len(sorted_parts)-1 and len(self.packages) == 0)
+				"\u2514\u2500\u2500\u25BA" if (
+					i == len(sorted_parts)-1 
+					and len(self.packages) == 0 and self.relationships is None
+				)
 				else "\u251c\u2500\u2500\u25BA"
 			)
-			s += f"{arrow}\U0001F4C4 '{part}'\n"
+			if not part.endswith(".rels"):
+				s += f"{arrow}\U0001F4C4 '{part}'\n"
+			else:
+				s += f"{arrow}\u26D3 \U0001F4C4 '{part}'\n"
 		
+		# Sort packages names
+		sorted_packages = sorted(self.packages.values(), key=lambda x: x.name)
+
 		# Compute string representation of child packages
-		if self.packages is not None:
-			# Sort packages names
-			sorted_packages = sorted(self.packages.values(), key=lambda x: x.name)
-			for i, package in enumerate(sorted_packages):
-				s += package._custom_str_(
-					depth=depth+1, last=i==len(sorted_packages)-1,
-					line_state=line_state[:]  # Pass-by-value
-				)
+		for i, package in enumerate(sorted_packages):
+			s += package._custom_str_(
+				depth=depth+1, last=(i==len(sorted_packages)-1 and self.relationships is None),
+				line_state=line_state[:]  # Pass-by-value
+			)
+		
+		# Compute string representation of relationships (_rels)
+		if self.relationships is not None:
+			s += self.relationships._custom_str_(
+				depth=depth+1, last=True, line_state=line_state[:]  # Pass-by-value
+			)
 
 		return s
