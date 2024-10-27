@@ -1,17 +1,25 @@
 from typing import Optional
 
-# LXML
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
 
-def print_etree(element: etreeElement) -> None:
+def etree_to_str(element: etreeElement) -> str:
     """
-    Prints XML element using LXML etree.tostring and decoding to utf-8
+    Computes XML element string representation using LXML etree.tostring and decoding to utf-8.
     :param element: XML element.
+    :return: XML element string representation.
     """
     etree.indent(tree=element, space="\t")
-    print(etree.tostring(element, pretty_print=True, encoding="utf-8").decode("utf-8"))
+    return etree.tostring(element, pretty_print=True, encoding="utf-8").decode("utf-8") 
+
+
+def print_etree(element: etreeElement) -> None:
+    """
+    Prints XML element using etree_to_str.
+    :param element: XML element.
+    """
+    print(etree_to_str(element=element))
 
 
 def local_name(element: etreeElement) -> str:
@@ -24,23 +32,23 @@ def local_name(element: etreeElement) -> str:
 
 
 def element_skeleton(element: etreeElement) -> etreeElement:
-    """_summary_
-
+    """
+    Computes the element skeleton (node metadata without including the child nodes information) of an XML element.
     :param element: _description_
     :return: _description_
     """
     return etree.Element(element.tag, attrib=element.attrib)
 
 
-def xpath_query(element: etreeElement, query: str, singleton: bool = False, nullable=True) -> Optional[etreeElement | list[etreeElement]]:
+def xpath_query(
+        element: etreeElement, query: str, singleton: bool = False, nullable: bool = True
+    ) -> Optional[etreeElement | list[etreeElement]]:
     """
-    Wrapper of the .xpath() class function of the lxml package to avoid having to specify
-    the namespaces every time.
+    Wrapper of the .xpath() class function of the lxml package to avoid having to specify the namespaces every time.
     Also handles the empty result cases, where instead of an empty list returns None.
     :param element: XML element to perform the xpath query on.
     :param query: Xpath query string.
-    :param singleton: Boolean indicating whether the result should only yield
-    no results or one result, defaults to False.
+    :param singleton: Boolean indicating whether the result should only yield no results or one result, defaults to False.
     :param nullable: Boolean indicating whether the result can be None, defaults to True.
     :return: Xpath query results, None when the result is empty.
     :raises ValueError: Raises error if singleton or nullable constraints are failed.
@@ -52,7 +60,7 @@ def xpath_query(element: etreeElement, query: str, singleton: bool = False, null
             raise ValueError(f"xpath nullable constraint error for query: {query}")
         return None
     
-    #
+
     if singleton:
         if len(query_result) != 1:
             raise ValueError(f"xpath singleton constraint error for query: {query}\nresult: {query_result}")
