@@ -1,13 +1,13 @@
 from __future__ import annotations
 from pydantic import Field
-from typing import Optional, Literal
+from typing import Optional
 
 import re
 
-# LXML
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
+from utils.etree import etree_to_str
 from utils.pydantic import ArbitraryBaseModel
 
 
@@ -23,24 +23,19 @@ class OoxmlPart(ArbitraryBaseModel):
 		"""
 		Initializes an OOXML part with the content of a OOXML file part.
 
-		:param name:
-		:param content: 
+		:param name: The name of the OOXML part.
+		:param content: String representation of the OOXML.
 		"""
 		return cls(name=name, element=etree.fromstring(content))
 
 	def __str__(self) -> str:
-		s = f"\U0001F4C4 '{self.name}'\n"
-		etree.indent(tree=self.element, space="\t")
-		s += etree.tostring(self.element, pretty_print=True, encoding="utf8").decode("utf8")
-		return s
+		return f"\U0001F4C4 '{self.name}'\n{etree_to_str(element=self.element)}"
 
 
 class OoxmlPackage(ArbitraryBaseModel):
 	"""
-	Represents an OOXML (Office Open XML) package,
-	 which can contain multiple parts and nested packages.
-	
-	It processes the content of an OOXML file to organize and manage these parts and packages.
+	Represents an OOXML (Office Open XML) package, which can contain multiple parts and nested packages.
+	Can contain an associated package which specifies the relationships between parts (identified by the '_rels' file extension).
 	"""
 	name: str
 
@@ -57,34 +52,37 @@ class OoxmlPackage(ArbitraryBaseModel):
 		Initializes an OOXML package with a given name and contents.
 
 		:param name: The name of the OOXML package.
-		:param contents: 		
+		:param contents: Dictionary representation of the OOXML parts inside the OOXML package.
+		 - Keys: OOXML file part root path name (separated by '/').
+		 - Values: String representation of the OOXML.
 		"""
 		parts = {}
 		packages = {}
-		_rels = None
+		relationships = None
 
+		# Load package level and initialize subpackage structures
 		_packages: dict[str, dict[str, str]] = {}
 		for _name, content in contents.items():
 			name_split = _name.split("/")
 			
-			#
+			# Load parts found in the package level
 			if len(name_split) == 1:
 				parts[_name] = OoxmlPart.load(name=_name, content=content)
 				continue
 			
-			#
+			# Initialize found subpackage structures in the package level
 			if name_split[0] not in _packages.keys():
 				_packages[name_split[0]] = {}
 			_packages[name_split[0]]["/".join(name_split[1:])] = content
 		
-		#
+		# Load subpackage levels into the initialized subpackage structures in the package level
 		for _name, contents in _packages.items():
 			if _name == "_rels":
-				_rels = OoxmlPackage.load(name="_rels", contents=contents)
+				relationships = OoxmlPackage.load(name="_rels", contents=contents)
 			else:
 				packages[_name] = OoxmlPackage.load(name=_name, contents=contents)
 		
-		return cls(name=name, parts=parts, packages=packages, relationships=_rels)
+		return cls(name=name, parts=parts, packages=packages, relationships=relationships)
 
 	def __str__(self) -> str:
 		return self._custom_str_()

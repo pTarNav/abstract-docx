@@ -86,7 +86,7 @@ class OoxmlDocxStyleTree(ArbitraryBaseModel):
 
 		Because ids are assumed to be unique, this function will return the first match,
 		 in the case where no style type is specified it will search in the following order:
-		 run > paragraph > table > numbering
+		run > paragraph > table > numbering
 
 		:param id: _description_
 		:param type: _description_
