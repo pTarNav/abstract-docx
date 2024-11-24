@@ -1,13 +1,72 @@
 from __future__ import annotations
 from typing import Optional
+from utils.pydantic import ArbitraryBaseModel
 
-import re
+import os
 
 from lxml import etree
 from lxml.etree import _Element as etreeElement
 
-from utils.etree import etree_to_str
-from utils.pydantic import ArbitraryBaseModel
+
+class OoxmlElement(ArbitraryBaseModel):
+	"""
+	Represents an OOXML (Office Open XML) element.
+	Wrapper class for lxml _Element (referenced throughout as etreeElement).
+	"""
+	element: etreeElement
+
+	@property
+	def local_name(self) -> str:
+		"""
+		Removes namespace from the XML element name.
+		:return: Clean XML element name without the namespace prefix.
+		"""
+		return etree.QName(self.element).localname
+
+	@property
+	def skeleton(self) -> OoxmlElement:
+		"""
+		Computes the element skeleton (node metadata without including the child nodes information) of an XML element.
+		:return: XML element skeleton.
+		"""
+		return OoxmlElement(element=etree.Element(self.element.tag, attrib=self.element.attrib))
+
+
+	def xpath_query(self, query: str, nullable: bool = True, singleton: bool = False) -> XpathQueryResult:
+		"""
+		Wrapper of the .xpath() class function of the lxml package to avoid having to specify the namespaces every time.
+		Handles the empty result cases, where instead of an empty list returns None.
+		Also handles nullable and singleton constraints set by the user.
+		:param query: Xpath query string.
+		:param nullable: Boolean indicating whether the result can be None, defaults to True.
+		:param singleton: Boolean indicating whether the result should only yield no results or one result, defaults to False.
+		:return: Xpath query results, None when the result is empty.
+		:raises ValueError: Raises error if nullable or single constraints are failed.
+		"""
+		query_result: etreeElement = self.element.xpath(query, namespaces=self.element.nsmap)
+		
+		if len(query_result) == 0:
+			if not nullable:
+				raise ValueError(f"xpath nullable constraint error for query: {query}")
+			return None
+		
+		if singleton:
+			if len(query_result) != 1:
+				raise ValueError(f"xpath singleton constraint error for query: {query}\nresult: {query_result}")
+			return query_result[0]
+		
+		return OoxmlElement(element=query_result)
+
+	def __str__(self) -> str:
+		"""
+		Computes XML element string representation using LXML etree.tostring and decoding to utf-8.
+		:return: XML element string representation.
+		"""
+		etree.indent(tree=self.element, space="\t")
+		return etree.tostring(self.element, pretty_print=True, encoding="utf-8").decode("utf-8")
+
+
+XpathQueryResult = Optional[OoxmlElement | list[OoxmlElement]]
 
 
 class OoxmlPart(ArbitraryBaseModel):
@@ -15,20 +74,20 @@ class OoxmlPart(ArbitraryBaseModel):
 	Represents an OOXML (Office Open XML) part, which is a component of an OOXML package.
 	"""
 	name: str
-	element: etreeElement
+	element: OoxmlElement
 
 	@classmethod
 	def load(cls, name: str, content: str) -> OoxmlPart:
 		"""
-		Initializes an OOXML part with the content of a OOXML file part.
+		Initializes an OOXML part with the content of a OOXML file (.xml).
 
-		:param name: The name of the OOXML part.
+		:param name: The name of the OOXML part. Removing .xml extension if necessary.
 		:param content: String representation of the OOXML.
 		"""
-		return cls(name=name, element=etree.fromstring(content))
+		return cls(name=os.path.splitext(name), element=OoxmlElement(element=etree.fromstring(content)))
 
 	def __str__(self) -> str:
-		return f"\U0001F4C4 '{self.name}'\n{etree_to_str(element=self.element)}"
+		return f"\U0001F4C4 '{self.name}'\n{self.element.__str__()}"
 
 
 class OoxmlPackage(ArbitraryBaseModel):
@@ -37,49 +96,46 @@ class OoxmlPackage(ArbitraryBaseModel):
 	Can contain an associated package which specifies the relationships between parts (identified by the '_rels' file extension).
 	"""
 	name: str
-
-	# Note that it avoids using a mutable default dictionary which can lead to unintended behavior,
-	# using pydantic dictionary field generator instead.
-	parts: dict[str, OoxmlPart] = Field(default_factory=dict)
-	packages: dict[str, OoxmlPackage] = Field(default_factory=dict)
-
+	parts: dict[str, OoxmlPart] = {}
+	packages: dict[str, OoxmlPackage] = {}	
 	relationships: Optional[OoxmlPackage] = None
 
 	@classmethod
 	def load(cls, name: str, contents: dict[str, str]) -> OoxmlPackage:
 		"""
-		Initializes an OOXML package with a given name and contents.
+		Initializes an OOXML package with the given name and OOXML contents.
 
 		:param name: The name of the OOXML package.
-		:param contents: Dictionary representation of the OOXML parts inside the OOXML package.
-		 - Keys: OOXML file part root path name (separated by '/').
-		 - Values: String representation of the OOXML.
+		:param contents: Dictionary representation of the OOXML content inside the OOXML package.
+		 - Keys: OOXML file part root path name (split by '/').
+		 - Values: String representation of the OOXML part.
 		"""
 		parts = {}
 		packages = {}
 		relationships = None
 
-		# Load package level and initialize subpackage structures
+		# Load package level parts and initialize subpackage structures
 		_packages: dict[str, dict[str, str]] = {}
-		for _name, content in contents.items():
-			name_split = _name.split("/")
+		for content_name, content in contents.items():
+			# Remove file name extension and split by directory structure
+			_name = os.path.splitext(content_name)[0].split("/")
 			
 			# Load parts found in the package level
-			if len(name_split) == 1:
-				parts[_name] = OoxmlPart.load(name=_name, content=content)
+			if len(_name) == 1:
+				parts[content_name] = OoxmlPart.load(name=content_name, content=content)
 				continue
 			
 			# Initialize found subpackage structures in the package level
-			if name_split[0] not in _packages.keys():
-				_packages[name_split[0]] = {}
-			_packages[name_split[0]]["/".join(name_split[1:])] = content
+			if _name[0] not in _packages.keys():
+				_packages[_name[0]] = {}
+			_packages[_name[0]]["/".join(_name[1:])] = content
 		
 		# Load subpackage levels into the initialized subpackage structures in the package level
-		for _name, contents in _packages.items():
-			if _name == "_rels":
+		for package_name, contents in _packages.items():
+			if package_name == "_rels":
 				relationships = OoxmlPackage.load(name="_rels", contents=contents)
 			else:
-				packages[_name] = OoxmlPackage.load(name=_name, contents=contents)
+				packages[package_name] = OoxmlPackage.load(name=package_name, contents=contents)
 		
 		return cls(name=name, parts=parts, packages=packages, relationships=relationships)
 
