@@ -39,8 +39,8 @@ def local_name(element: etreeElement) -> str:
 def element_skeleton(element: etreeElement) -> etreeElement:
     """
     Computes the element skeleton (node metadata without including the child nodes information) of an XML element.
-    :param element: _description_
-    :return: _description_
+    :param element: XML element.
+    :return: XML element skeleton.
     """
     return etree.Element(element.tag, attrib=element.attrib)
 
