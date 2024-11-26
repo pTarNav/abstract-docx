@@ -4,7 +4,7 @@ from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.properties import rPr, pPr
-from ooxml_docx.styles import OoxmlStyles, ParagraphStyle, NumberingStyle
+from ooxml_docx.styles import Style, OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, NumberingStyle
 
 
 class NumberingStyle(NumberingStyle):
@@ -29,7 +29,7 @@ class Level(OoxmlElement):
 	style: Optional[NumberingStyle | ParagraphStyle] = None
 
 	@classmethod
-	def parse(cls, ooxml_level: OoxmlElement) -> Level:
+	def parse(cls, ooxml_level: OoxmlElement, styles: OoxmlStyles) -> Level:
 		"""_summary_
 
 		:param ooxml_level: _description_
@@ -37,7 +37,7 @@ class Level(OoxmlElement):
 		"""
 		ooxml_run_properties: Optional[OoxmlElement] = ooxml_level.xpath_query(query="./w:rPr", singleton=True)
 		ooxml_paragraph_properties: Optional[OoxmlElement] = ooxml_level.xpath_query(query="./w:pPr", singleton=True)
-
+		
 		return cls(
 			element=ooxml_level.element,
 			id=int(ooxml_level.xpath_query(query="./@w:ilvl", singleton=True, nullable=False)),
@@ -45,9 +45,30 @@ class Level(OoxmlElement):
 				query="./*[not(self::w:name or self::w:pPr or self::w:rPr or self::w:pStyle)]"
 			),
 			run_properties=rPr(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None,
-			paragraph_properties=pPr(ooxml=ooxml_paragraph_properties) if ooxml_paragraph_properties is not None else None
+			paragraph_properties=pPr(ooxml=ooxml_paragraph_properties) if ooxml_paragraph_properties is not None else None,
+			style=cls._parse_style(ooxml_level=ooxml_level, styles=styles)
 		)
 	
+	@staticmethod
+	def _parse_style(ooxml_level: OoxmlElement, styles: OoxmlStyles) -> Optional[NumberingStyle | ParagraphStyle]:
+		"""_summary_
+
+		:param ooxml_level: _description_
+		:param styles: _description_
+		:return: _description_
+		"""
+
+		style_id: Optional[str] = ooxml_level.xpath_query(query="./w:pStyle/@w:val", singleton=True)
+		if style_id is None:
+			return None
+		style_id = str(style_id)
+
+		numbering_style_search_result: Optional[NumberingStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.NUMBERING)
+		if numbering_style_search_result is not None:
+			return numbering_style_search_result
+		
+		return styles.find(id=style_id, type=OoxmlStyleTypes.PARAGRAPH)
+
 	def __str__(self) -> str:
 		return f"{self.id}"
 
@@ -77,7 +98,7 @@ class AbstractNumbering(OoxmlElement):
 			element=ooxml_abstract_numbering.element,
 			id=int(ooxml_abstract_numbering.xpath_query(query="./@w:abstractNumId", singleton=True, nullable=False)),
 			name=str(name) if name is not None else None,
-			levels=cls._parse_levels(ooxml_abstract_numbering=ooxml_abstract_numbering)
+			levels=cls._parse_levels(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles)
 		)
 		
 		# Associate abstract numbering to each one of its levels
@@ -88,7 +109,7 @@ class AbstractNumbering(OoxmlElement):
 		
 	
 	@staticmethod
-	def _parse_levels(ooxml_abstract_numbering: OoxmlElement) -> dict[int, Level]:
+	def _parse_levels(ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles) -> dict[int, Level]:
 		"""_summary_
 
 		:param ooxml_abstract_numbering: _description_
@@ -100,7 +121,7 @@ class AbstractNumbering(OoxmlElement):
 		
 		levels: dict[int, Level] = {}
 		for ooxml_level in ooxml_levels:
-			level: Level = Level.parse(ooxml_level=ooxml_level)
+			level: Level = Level.parse(ooxml_level=ooxml_level, styles=styles)
 			levels[level.id] = level
 		
 		return levels
