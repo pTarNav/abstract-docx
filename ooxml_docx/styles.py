@@ -365,5 +365,60 @@ class OoxmlStyles(ArbitraryBaseModel):
 			default_run_properties=rPr(ooxml=default_rPr) if default_rPr is not None else None
 		)
 	
+	def find(self, id: str, type: Optional[OoxmlStyleTypes] = None) -> Optional[Style]:
+		"""_summary_
+
+		Because ids are assumed to be unique, this function will return the first match,
+		 where in the case where no style type is specified it will search in the following order:
+			run > paragraph > table > numbering
+
+		:param id: _description_
+		:param type: _description_
+		:return: _description_
+		"""
+		
+		search_space: list[Style] = []
+		match type:
+			case OoxmlStyleTypes.RUN:
+				search_space = self.roots.run
+			case OoxmlStyleTypes.PARAGRAPH:
+				search_space = self.roots.paragraph
+			case OoxmlStyleTypes.TABLE:
+				search_space = self.roots.table
+			case OoxmlStyleTypes.NUMBERING:
+				search_space = self.roots.numbering
+			case _:
+				# Append all the style tree roots types into a single one
+				search_space = self.roots.run + self.roots.paragraph + self.roots.table + self.roots.numbering
+		
+		for root in search_space:
+			search_result: Optional[Style] = self._find(id=id, root=root)
+			if search_result is not None:
+				return search_result
+		
+		# No match found
+		return None
+
+	def _find(self, id: str, root: Style) -> Optional[Style]:
+		"""
+		Searches the given id inside the given tree and returns the matching style found.
+		If no matches where found, returns None.
+
+		:param id: _description_
+		:param root: _description_
+		:return: _description_
+		"""
+		if root.id == id:
+			return root
+		if root.children is None or len(root.children) == 0:
+			return None
+
+		for style in root.children:
+			search_result: Optional[Style] = self._find(id=id, root=style)
+			if search_result is not None:
+				return search_result
+		
+		return None
+
 	def __str__(self) -> str:
 		return self.roots.__str__()
