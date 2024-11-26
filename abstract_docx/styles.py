@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Literal
 
-from ooxml_docx.ooxml_docx import OoxmlPart
+from ooxml_docx.docx import OoxmlPart
 from utils.etree_element_aux import xpath_query
 
 # LXML
