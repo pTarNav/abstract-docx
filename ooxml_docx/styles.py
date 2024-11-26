@@ -59,7 +59,7 @@ class Style(OoxmlElement):
 			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
 			if depth > 0 else ""
 		)
-		s = f"{arrow} \033[1m{self.id}\033[0m: '{self.name}'\n"
+		s = f"{arrow} \033[1m{self.id}\033[0m: '{self.name if self.name is not None else ''}'\n"
 
 		# Update the line state for the current depth
 		if depth > 0:
@@ -306,6 +306,7 @@ class OoxmlStylesRoots(ArbitraryBaseModel):
 		for i, style in enumerate(self.numbering):
 			s += style._tree_str_(depth=1, last=i==len(self.numbering)-1)
 		return s
+
 
 class OoxmlStyles(ArbitraryBaseModel):
 	"""
