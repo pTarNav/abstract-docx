@@ -7,7 +7,7 @@ from utils.pydantic import ArbitraryBaseModel
 import re
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.properties import rPr, pPr, tblPr, tblStylePr, trPr, tcPr, numPr
+from ooxml_docx.structure.properties import rPr, pPr, tblPr, tblStylePr, trPr, tcPr, numPr
 
 
 class Style(OoxmlElement):

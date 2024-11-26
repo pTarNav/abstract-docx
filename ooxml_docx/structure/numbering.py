@@ -3,9 +3,9 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.properties import rPr, pPr
-from ooxml_docx.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, NumberingStyle, Style
-from ooxml_docx.styles import NumberingStyle as BaseNumberingStyle
+from ooxml_docx.structure.properties import rPr, pPr
+from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, NumberingStyle, Style
+from ooxml_docx.structure.styles import NumberingStyle as BaseNumberingStyle
 
 
 class NumberingStyle(NumberingStyle):
