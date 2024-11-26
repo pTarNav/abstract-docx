@@ -183,8 +183,11 @@ class TableStyle(Style):
 
 class NumberingStyle(Style):
 	"""
-	Represents a .docx numbering style. Which can contain numbering properties,
-	 and be inherited by or inherit abstract numbering definitions properties
+	Represents a .docx numbering style.
+	Which can contain numbering properties, and be inherited by or inherit abstract numbering definitions properties
+	
+	Important: Import NumberingStyle from ooxml_docx.numbering as this definition is incomplete!
+
 	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[numPr] = None
