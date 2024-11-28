@@ -109,7 +109,7 @@ class RunStyle(Style):
 	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[rPr] = None
-
+	
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> RunStyle:
 		"""_summary_

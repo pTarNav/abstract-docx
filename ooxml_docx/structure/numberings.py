@@ -118,7 +118,6 @@ class AbstractNumbering(OoxmlElement):
 
 		return abstract_numbering
 		
-	
 	@staticmethod
 	def _parse_levels(ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles) -> dict[int, Level]:
 		"""_summary_
