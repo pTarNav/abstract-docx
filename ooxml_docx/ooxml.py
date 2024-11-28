@@ -100,7 +100,7 @@ class OoxmlPart(ArbitraryBaseModel):
 class OoxmlPackage(ArbitraryBaseModel):
 	"""
 	Represents an OOXML (Office Open XML) package, which can contain multiple parts and nested packages.
-	Can contain an associated package which specifies the relationships between parts (identified by the '_rels' file extension).
+	Can contain an associated package which specifies the relationships between parts ('_rels' file extension).
 	"""
 	name: str
 	content: dict[str, OoxmlPart | OoxmlPackage] = {}
