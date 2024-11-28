@@ -118,7 +118,6 @@ class AbstractNumbering(OoxmlElement):
 
 		return abstract_numbering
 		
-	
 	@staticmethod
 	def _parse_levels(ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles) -> dict[int, Level]:
 		"""_summary_
@@ -192,26 +191,169 @@ class AbstractNumbering(OoxmlElement):
 
 		return s
 
+
+class LevelOverride(OoxmlElement):
+	"""_summary_
+
+	:return: _description_
+	"""
+	id: int
+	level: Optional[Level] = None
+	start: Optional[int] = None
+
+	# Note that numbering and overridden level are optional in order to facilitate the construction
+	# however, they should not be empty and always associated to a numbering instance and the respective overridden level.
+	numbering: Optional[Numbering] = None
+	overridden_level: Optional[Level] = None
+
+	@classmethod
+	def parse(cls, ooxml_level_override: OoxmlElement, styles: OoxmlStyles) -> LevelOverride:
+		"""_summary_
+
+		:param ooxml_level_override: _description_
+		:return: _description_
+		"""
+		id: int = int(ooxml_level_override.xpath_query(query="./@w:ilvl", nullable=False, singleton=True))
+		start: Optional[int] = ooxml_level_override.xpath_query(query="./w:startOverride/@w:val", singleton=True)
+
+		return cls(
+			element=ooxml_level_override.element,
+			id=id,
+			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id),
+			start=int(start) if start is not None else None
+		)
+
+	@staticmethod
+	def _parse_level(ooxml_level_override: OoxmlElement, styles: OoxmlStyles, id: int) -> Optional[Level]:
+		"""_summary_
+
+		:param ooxml_level_override: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		ooxml_level: Optional[OoxmlElement] = ooxml_level_override.xpath_query(query="./w:lvl", singleton=True)
+		if ooxml_level is None:
+			return None
+		
+		level: Level = Level.parse(ooxml_level=ooxml_level, styles=styles)
+
+		# Check that the level override id and override level definition id match
+		if level.id != id:
+			raise ValueError((
+				f"Level override id (<w:lvlOverride w:ilvl={id}>)"
+				f" and override level definition id (<w:lvl w:ilvl={level.id}>) do not match"
+			))
+
+		return level
+
 class Numbering(OoxmlElement):
 	"""
 	"""
 	id: int
 	abstract_numbering: AbstractNumbering
+	overrides: dict[int, LevelOverride] = {}
+
+	@classmethod
+	def parse(
+		cls, ooxml_numbering: OoxmlElement, abstract_numberings: list[AbstractNumbering], styles: OoxmlStyles
+	) -> Numbering:
+		"""_summary_
+
+		:param ooxml_numbering: _description_
+		:return: _description_
+		"""
+		abstract_numbering: AbstractNumbering =cls._parse_abstract_numbering(
+				ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings
+		)
+		
+		numbering: Numbering = cls(
+			element=ooxml_numbering.element,
+			id=int(ooxml_numbering.xpath_query(query="./@w:numId", nullable=False, singleton=True)),
+			abstract_numbering=abstract_numbering,
+			overrides=cls._parse_level_overrides(
+				ooxml_numbering=ooxml_numbering, abstract_numbering=abstract_numbering, styles=styles
+			)
+		)
+
+		#
+		if numbering.abstract_numbering.numberings is None:
+			numbering.abstract_numbering.numberings = []
+		numbering.abstract_numbering.numberings.append(numbering)
+
+		#
+		for override in numbering.overrides.values():
+			override.numbering = numbering
+
+		return numbering
+	
+	@staticmethod
+	def _parse_abstract_numbering(
+		ooxml_numbering: OoxmlElement, abstract_numberings: list[AbstractNumbering]
+	) -> AbstractNumbering:
+		"""_summary_
+
+		:param ooxml_numbering: _description_
+		:param abstract_numberings: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		abstract_numbering_id: int = int(ooxml_numbering.xpath_query(
+			query="./w:abstractNumId/@w:val", nullable=False, singleton=True
+		))
+		abstract_numbering: Optional[AbstractNumbering] = next(
+			(
+				abstract_numbering for abstract_numbering in abstract_numberings
+				if abstract_numbering.id == abstract_numbering_id
+			),
+			None
+		)
+		if abstract_numbering is None:
+			raise ValueError(f"No abstract numbering definition <w:abstractNum> found for abstractNumId: {abstract_numbering}")
+
+		return abstract_numbering
+
+	@staticmethod
+	def _parse_level_overrides(
+		ooxml_numbering: OoxmlElement, abstract_numbering: AbstractNumbering, styles: OoxmlStyles
+	) -> dict[int, LevelOverride]:
+		"""_summary_
+
+		:param ooxml_numbering: _description_
+		:param abstract_numbering: Abstract numbering associated to the numbering instance.
+		:return: _description_
+		"""
+		ooxml_level_overrides: Optional[OoxmlElement] = ooxml_numbering.xpath_query(query="./w:lvlOverride")
+		if ooxml_level_overrides is None:
+			return {}
+		
+		level_overrides: dict[int, LevelOverride] = {}
+		for ooxml_level_override in ooxml_level_overrides:
+			level_override: LevelOverride = LevelOverride.parse(ooxml_level_override=ooxml_level_override, styles=styles)
+			level_override.overridden_level = abstract_numbering.levels[level_override.id]  # Associate overridden level
+			level_overrides[level_override.id] = level_override
+
+		return level_overrides
 
 
-class OoxmlNumbering(ArbitraryBaseModel):
+class OoxmlNumberings(ArbitraryBaseModel):
 	abstract_numberings: list[AbstractNumbering] = []
 	numberings: list[Numbering] = []
 
 	@classmethod
-	def build(cls, ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlNumbering:
+	def build(cls, ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlNumberings:
 		"""_summary_
 
 		:return: _description_
 		"""
+		abstract_numberings: list[AbstractNumbering] = cls._parse_abstract_numberings(
+			ooxml_numbering_part=ooxml_numbering_part, styles=styles
+		)
+
 		return cls(
-			abstract_numberings=cls._parse_abstract_numberings(ooxml_numbering_part=ooxml_numbering_part, styles=styles),
-			numberings=cls._parse_numberings(ooxml_numbering_part=ooxml_numbering_part)
+			abstract_numberings=abstract_numberings,
+			numberings=cls._parse_numberings(
+				ooxml_numbering_part=ooxml_numbering_part, abstract_numberings=abstract_numberings, styles=styles
+			)
 		)
 	
 	@staticmethod
@@ -228,19 +370,29 @@ class OoxmlNumbering(ArbitraryBaseModel):
 		if ooxml_abstract_numberings is None:
 			return []
 		
-		abstract_numberings: list[AbstractNumbering] = []
-		for ooxml_abstract_numbering in ooxml_abstract_numberings:
-			abstract_numbering: AbstractNumbering = AbstractNumbering.parse(
-				ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles
-			)
-			abstract_numberings.append(abstract_numbering)
-		
-		return abstract_numberings
+		return [
+			AbstractNumbering.parse(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles)
+			for ooxml_abstract_numbering in ooxml_abstract_numberings
+		]
 
 		
 	@staticmethod
-	def _parse_numberings(ooxml_numbering_part: OoxmlPart) -> list[Numbering]:
-		return []
+	def _parse_numberings(
+		ooxml_numbering_part: OoxmlPart, abstract_numberings: list[AbstractNumbering], styles: OoxmlStyles
+	) -> list[Numbering]:
+		"""_summary_
+
+		:param ooxml_numbering_part: _description_
+		:return: _description_
+		"""
+		ooxml_numberings: Optional[list[OoxmlElement]] = ooxml_numbering_part.ooxml.xpath_query(query="./w:num")
+		if ooxml_numberings is None:
+			return []
+		
+		return [
+			Numbering.parse(ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings, styles=styles)
+			for ooxml_numbering in ooxml_numberings
+		]
 	
 	def __str__(self) -> str:
 		s = "\033[36m\033[1mAbstract numberings\033[0m\n"

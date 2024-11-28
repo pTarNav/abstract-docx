@@ -96,7 +96,10 @@ class DocDefaults(Style):
 		if not any(values.get(attr) for attr
 			in ("default_paragraph_properties", "default_run_properties")
 		):
-			raise ValueError("<DocDefaults> must at least include either 'default_paragraph_properties' (<pPr>) or 'default_run_properties' (<rPr>)")
+			raise ValueError((
+				"<DocDefaults> must at least include either 'default_paragraph_properties' (<pPr>)"
+				" or 'default_run_properties' (<rPr>)"
+			))
 		return values
 
 
@@ -106,7 +109,7 @@ class RunStyle(Style):
 	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[rPr] = None
-
+	
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> RunStyle:
 		"""_summary_
