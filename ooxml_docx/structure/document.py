@@ -69,7 +69,7 @@ class RunText(RunContent):
 
 
 class Run(OoxmlElement):
-	content: list[RunText | SpecialRunText]
+	content: list[RunContent]
 	
 	properties: Optional[RunProperties] = None
 	style: Optional[RunStyle] = None
@@ -91,7 +91,7 @@ class Run(OoxmlElement):
 		)
 
 	@staticmethod
-	def _parse_content(ooxml_run: OoxmlElement) -> list[RunText | SpecialRunText]:
+	def _parse_content(ooxml_run: OoxmlElement) -> list[RunContent]:
 		"""_summary_
 
 		:param ooxml_run: _description_
@@ -101,7 +101,7 @@ class Run(OoxmlElement):
 		if ooxml_content is None:
 			return []
 		
-		content: list[RunText | SpecialRunText] = []
+		content: list[RunContent] = []
 		for ooxml_element in ooxml_content:
 			if ooxml_element.local_name == "t":
 				element: RunText = RunText.parse(ooxml_text=ooxml_element)
@@ -154,9 +154,13 @@ class Paragraph(OoxmlElement):
 		:param ooxml_paragraph: _description_
 		:return: _description_
 		"""
+		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./pPr", singleton=True)
+
 		return cls(
 			element=ooxml_paragraph.element,
-			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles)
+			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles),
+			properties=ParagraphProperties(ooxml=properties) if properties is not None else None,
+			style=cls._parse_style(ooxml_paragraph=ooxml_paragraph, styles=styles)
 		)
 
 	@staticmethod
@@ -167,7 +171,6 @@ class Paragraph(OoxmlElement):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-
 		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./w:r | ./w:hyperlink")
 		if ooxml_content is None:
 			return []
@@ -183,8 +186,27 @@ class Paragraph(OoxmlElement):
 					raise ValueError("")  # TODO
 			content.append(element)
 		
-		print(", ".join([element.__str__() for element in content]))
 		return content
+
+	@staticmethod
+	def _parse_style(ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> ParagraphStyle:
+		"""_summary_
+
+		:param ooxml_paragraph: _description_
+		:param styles: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		style_id: Optional[str] = ooxml_paragraph.xpath_query(query="./w:pPr/w:pStyle/@w:val", singleton=True)
+		if style_id is None:
+			return None
+		style_id = str(style_id)
+
+		paragraph_style_search_result: Optional[ParagraphStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.PARAGRAPH)
+		if paragraph_style_search_result is not None:
+			return paragraph_style_search_result
+
+		raise ValueError("")  # TODO
 
 
 class TableCell(OoxmlElement):
