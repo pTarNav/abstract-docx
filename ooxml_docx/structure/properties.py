@@ -1,9 +1,7 @@
-from utils.pydantic import ArbitraryBaseModel
-
 from ooxml_docx.ooxml import OoxmlElement
 
 
-class OoxmlProperty(OoxmlElement):
+class OoxmlProperties(OoxmlElement):
 	"""_summary_
 
 
@@ -27,36 +25,36 @@ class OoxmlProperty(OoxmlElement):
 			)
 
 
-class rPr(OoxmlProperty):
+class RunProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="rPr")
 
 
-class pPr(OoxmlProperty):
+class ParagraphProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="pPr")
 
 
-class tblPr(OoxmlProperty):
+class TableProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="tblPr")
 
 
-class tblStylePr(OoxmlProperty):
+class TableConditionalProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="tblStylePr")
 
 
-class trPr(OoxmlProperty):
+class TableRowProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="trPr")
 
 
-class tcPr(OoxmlProperty):
+class TableCellProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="tcPr")
 
 
-class numPr(OoxmlProperty):
+class NumberingProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="numPr")

@@ -3,12 +3,11 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import rPr, pPr
-from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, NumberingStyle, Style
-from ooxml_docx.structure.styles import NumberingStyle as BaseNumberingStyle
+from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
+from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle, Style
 
 
-class NumberingStyle(NumberingStyle):
+class NumberingStyle(_NumberingStyle):
 	"""_summary_
 
 	Important: This is the complete version and the one that should be used for imports.
@@ -29,8 +28,8 @@ class Level(OoxmlElement):
 	abstract_numbering: Optional[AbstractNumbering] = None
 
 	properties: Optional[list[OoxmlElement]] = None
-	run_properties: Optional[rPr] = None
-	paragraph_properties: Optional[pPr] = None
+	run_properties: Optional[RunProperties] = None
+	paragraph_properties: Optional[ParagraphProperties] = None
 	
 	style: Optional[NumberingStyle | ParagraphStyle] = None
 
@@ -50,8 +49,9 @@ class Level(OoxmlElement):
 			properties=ooxml_level.xpath_query(
 				query="./*[not(self::w:name or self::w:pPr or self::w:rPr or self::w:pStyle)]"
 			),
-			run_properties=rPr(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None,
-			paragraph_properties=pPr(ooxml=ooxml_paragraph_properties) if ooxml_paragraph_properties is not None else None,
+			run_properties=RunProperties(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None,
+			paragraph_properties=ParagraphProperties(ooxml=ooxml_paragraph_properties)
+			if ooxml_paragraph_properties is not None else None,
 			style=cls._parse_style(ooxml_level=ooxml_level, styles=styles)
 		)
 	
@@ -61,6 +61,7 @@ class Level(OoxmlElement):
 
 		:param ooxml_level: _description_
 		:param styles: _description_
+		:raises ValueError: _description_
 		:return: _description_
 		"""
 
@@ -73,7 +74,11 @@ class Level(OoxmlElement):
 		if numbering_style_search_result is not None:
 			return numbering_style_search_result
 		
-		return styles.find(id=style_id, type=OoxmlStyleTypes.PARAGRAPH)
+		paragraph_style_search_result: Optional[ParagraphStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.PARAGRAPH)
+		if paragraph_style_search_result is not None:
+			return paragraph_style_search_result
+		
+		raise ValueError("")  # TODO
 
 	def __str__(self) -> str:
 		return f"{self.id}"
@@ -137,7 +142,9 @@ class AbstractNumbering(OoxmlElement):
 		return levels
 	
 	@staticmethod
-	def _parse_associated_styles(ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles) -> AbstractNumberingAssociatedStyles:
+	def _parse_associated_styles(
+		ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles
+	) -> AbstractNumberingAssociatedStyles:
 		"""_summary_
 
 		:param ooxml_abstract_numbering: _description_
@@ -153,9 +160,9 @@ class AbstractNumbering(OoxmlElement):
 
 		style_children_ids: Optional[list[str]] = ooxml_abstract_numbering.xpath_query(query="./w:styleLink/@w:val")
 		if style_children_ids is not None:
-			style_children = []
+			style_children: list[NumberingStyle] = []
 			for style_children_id in style_children_ids:
-				style_child: Optional[NumberingStyle] = styles.find(id=str(style_children_id), type=OoxmlStyleTypes.NUMBERING)
+				style_child: Optional[_NumberingStyle] = styles.find(id=str(style_children_id), type=OoxmlStyleTypes.NUMBERING)
 				if style_child is not None:
 					# ! This is the most straightforward solution I have been able to find so far...
 					# The problem is that the NumberingStyle returned by styles.find() is the one defined at styles.py
