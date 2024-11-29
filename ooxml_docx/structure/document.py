@@ -57,7 +57,6 @@ class SpecialRunText(RunContent):
 
 
 class RunText(RunContent):
-	text: str
 
 	@classmethod
 	def parse(cls, ooxml_text: OoxmlElement) -> RunText:
