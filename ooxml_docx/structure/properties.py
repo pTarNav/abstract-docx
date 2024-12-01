@@ -2,10 +2,15 @@ from ooxml_docx.ooxml import OoxmlElement
 
 
 class OoxmlProperties(OoxmlElement):
-	"""_summary_
-
-
-	:raises ValueError: _description_
+	"""
+	Represents an OOXML (Office Open XML) properties element.
+	Where despite a general OOXML properties element not existing in the OOXML standard,
+	 it is helpful to have a general class that will enforce tag validation.
+	
+	Instead of needing to specify the fields for each type of properties element, store as the whole OOXML element.
+	Avoids OOXML versioning problems, as properties child elements are the most changed between different versions.
+	
+	:raises ValueError: Raises error if tag validation is failed.
 	"""
 	tag: str
 
@@ -13,11 +18,12 @@ class OoxmlProperties(OoxmlElement):
 		super().__init__(**data)
 		self.validate()
 
-	def validate(self) -> bool:
-		"""_summary_
+	def validate(self) -> None:
+		"""
+		Share method between all OOXML properties elements which checks if
+		 the parsed element tag matches with the expected type of properties element.
 
-		:raises ValueError: _description_
-		:return: _description_
+		:raises ValueError: Raises error if tag validation is failed.
 		"""
 		if self.local_name != self.tag:
 			raise ValueError(
