@@ -7,13 +7,16 @@ from utils.pydantic import ArbitraryBaseModel
 import re
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import rPr, pPr, tblPr, tblStylePr, trPr, tcPr, numPr
+from ooxml_docx.structure.properties import (
+	RunProperties, ParagraphProperties, 
+	TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties,
+	NumberingProperties
+)
 
 
 class Style(OoxmlElement):
-	"""_summary_
+	"""
 
-	:return: _description_
 	"""
 	id: str
 	name: Optional[str] = None
@@ -88,11 +91,11 @@ class DocDefaults(Style):
 
 	:param Style: Inherits attributes from Style.
 	"""
-	default_paragraph_properties: Optional[pPr] = None
-	default_run_properties: Optional[rPr] = None
+	default_paragraph_properties: Optional[ParagraphProperties] = None
+	default_run_properties: Optional[RunProperties] = None
 
 	@model_validator(mode="before")
-	def property_required(cls, values: dict[str, Any]) -> dict[str, Any]:
+	def Properties_required(cls, values: dict[str, Any]) -> dict[str, Any]:
 		if not any(values.get(attr) for attr
 			in ("default_paragraph_properties", "default_run_properties")
 		):
@@ -108,7 +111,7 @@ class RunStyle(Style):
 	Represents a .docx run style.
 	:param Style: Inherits attributes from Style.
 	"""
-	properties: Optional[rPr] = None
+	properties: Optional[RunProperties] = None
 	
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> RunStyle:
@@ -121,7 +124,7 @@ class RunStyle(Style):
 
 		return cls(
 			**Style.parse(ooxml_style=ooxml_style).model_dump(),
-			properties=rPr(ooxml=ooxml_properties) if ooxml_properties is not None else None,
+			properties=RunProperties(ooxml=ooxml_properties) if ooxml_properties is not None else None,
 		)
 
 
@@ -130,8 +133,8 @@ class ParagraphStyle(Style):
 	Represents a .docx paragraph style. Which can contain both paragraph and run properties.
 	:param Style: Inherits attributes from Style.
 	"""
-	properties: Optional[pPr] = None
-	run_properties: Optional[rPr] = None
+	properties: Optional[ParagraphProperties] = None
+	run_properties: Optional[RunProperties] = None
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> ParagraphStyle:
@@ -145,8 +148,8 @@ class ParagraphStyle(Style):
 
 		return cls(
 			**Style.parse(ooxml_style=ooxml_style).model_dump(),
-			properties=pPr(ooxml=ooxml_properties) if ooxml_properties is not None else None,
-			run_properties=rPr(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None
+			properties=ParagraphProperties(ooxml=ooxml_properties) if ooxml_properties is not None else None,
+			run_properties=RunProperties(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None
 		)
 
 
@@ -156,10 +159,10 @@ class TableStyle(Style):
 	Which can contain general and conditional table properties, as well as row and cell properties.
 	:param Style: Inherits attributes from Style.
 	"""
-	properties: Optional[tblPr] = None
-	conditional_properties: Optional[tblStylePr] = None
-	row_properties: Optional[trPr] = None
-	cell_properties: Optional[tcPr] = None
+	properties: Optional[TableProperties] = None
+	conditional_properties: Optional[TableConditionalProperties] = None
+	row_properties: Optional[TableRowProperties] = None
+	cell_properties: Optional[TableCellProperties] = None
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> TableStyle:
@@ -175,16 +178,16 @@ class TableStyle(Style):
 
 		return cls(
 			**Style.parse(ooxml_style=ooxml_style).model_dump(),
-			properties=tblPr(ooxml=ooxml_properties) if ooxml_properties is not None else None,
-			conditional_properties=tblStylePr(
+			properties=TableProperties(ooxml=ooxml_properties) if ooxml_properties is not None else None,
+			conditional_properties=TableConditionalProperties(
 				ooxml=ooxml_conditional_properties
 			) if ooxml_conditional_properties is not None else None,
-			row_properties=trPr(ooxml=ooxml_row_properties) if ooxml_row_properties is not None else None,
-			cell_properties=trPr(ooxml=ooxml_cell_properties) if ooxml_cell_properties is not None else None
+			row_properties=TableRowProperties(ooxml=ooxml_row_properties) if ooxml_row_properties is not None else None,
+			cell_properties=TableCellProperties(ooxml=ooxml_cell_properties) if ooxml_cell_properties is not None else None
 		)
 
 
-class NumberingStyle(Style):
+class _NumberingStyle(Style):
 	"""
 	Represents a .docx numbering style.
 	Which can contain numbering properties, and be inherited by or inherit abstract numbering definitions properties
@@ -193,10 +196,10 @@ class NumberingStyle(Style):
 
 	:param Style: Inherits attributes from Style.
 	"""
-	properties: Optional[numPr] = None
+	properties: Optional[NumberingProperties] = None
 
 	@classmethod
-	def parse(cls, ooxml_style: OoxmlElement) -> NumberingStyle:
+	def parse(cls, ooxml_style: OoxmlElement) -> _NumberingStyle:
 		"""_summary_
 
 		:param ooxml_style: _description_
@@ -207,7 +210,7 @@ class NumberingStyle(Style):
 
 		return cls(
 			**Style.parse(ooxml_style=ooxml_style).model_dump(),
-			properties=numPr(ooxml=ooxml_properties) if ooxml_properties is not None else None,
+			properties=NumberingProperties(ooxml=ooxml_properties) if ooxml_properties is not None else None,
 		)
 
 
@@ -222,7 +225,7 @@ OOXML_STYLE_TYPES_CLASSES: dict[OoxmlStyleTypes, type[Style]] = {
 	OoxmlStyleTypes.RUN: RunStyle,
 	OoxmlStyleTypes.PARAGRAPH: ParagraphStyle,
 	OoxmlStyleTypes.TABLE: TableStyle,
-	OoxmlStyleTypes.NUMBERING: NumberingStyle
+	OoxmlStyleTypes.NUMBERING: _NumberingStyle
 }
 
 
@@ -230,7 +233,7 @@ class OoxmlStylesRoots(ArbitraryBaseModel):
 	run: list[RunStyle] = []
 	paragraph: list[ParagraphStyle] = []
 	table: list[TableStyle] = []
-	numbering: list[NumberingStyle] = []
+	numbering: list[_NumberingStyle] = []
 
 	@classmethod
 	def build(cls, ooxml_styles_part: OoxmlElement) -> OoxmlStylesRoots:
@@ -367,8 +370,8 @@ class OoxmlStyles(ArbitraryBaseModel):
 		return DocDefaults(
 			element=ooxml_doc_defaults.element,
 			id="__DocDefaults__",
-			default_paragraph_properties=pPr(ooxml=default_pPr) if default_pPr is not None else None,
-			default_run_properties=rPr(ooxml=default_rPr) if default_rPr is not None else None
+			default_paragraph_properties=ParagraphProperties(ooxml=default_pPr) if default_pPr is not None else None,
+			default_run_properties=RunProperties(ooxml=default_rPr) if default_rPr is not None else None
 		)
 	
 	def find(self, id: str, type: Optional[OoxmlStyleTypes] = None) -> Optional[Style]:
