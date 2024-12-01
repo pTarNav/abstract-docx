@@ -5,7 +5,7 @@ from utils.pydantic import ArbitraryBaseModel
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, TableProperties, TableRowProperties, TableCellProperties
 from ooxml_docx.structure.styles import RunStyle, ParagraphStyle, TableStyle, OoxmlStyles, OoxmlStyleTypes
-
+from ooxml_docx.structure.numberings import NumberingStyle, Numbering
 
 class RunContent(OoxmlElement):
 	text: str
@@ -193,7 +193,8 @@ class Paragraph(OoxmlElement):
 	content: list[Run | Hyperlink] = []
 	
 	properties: Optional[ParagraphProperties] = None
-	style: Optional[ParagraphStyle] = None
+	style: Optional[ParagraphStyle | NumberingStyle] = None
+	numbering: Optional[Numbering] = None
 
 	@classmethod
 	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> Paragraph:
@@ -237,7 +238,7 @@ class Paragraph(OoxmlElement):
 		return content
 
 	@staticmethod
-	def _parse_style(ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> ParagraphStyle:
+	def _parse_style(ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> Optional[ParagraphStyle | NumberingStyle]:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
@@ -253,8 +254,12 @@ class Paragraph(OoxmlElement):
 		paragraph_style_search_result: Optional[ParagraphStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.PARAGRAPH)
 		if paragraph_style_search_result is not None:
 			return paragraph_style_search_result
+		
+		numbering_style_search_result: Optional[NumberingStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.NUMBERING)
+		if numbering_style_search_result is not None:
+			return numbering_style_search_result
 
-		raise ValueError("")  # TODO
+		raise ValueError(f"Undefined style reference for style id: {style_id}")
 
 	def __str__(self) -> str:
 		return self._tree_str_()

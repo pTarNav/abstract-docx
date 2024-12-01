@@ -28,6 +28,7 @@ class OoxmlElement(ArbitraryBaseModel):
 		Wrapper of the .xpath() class function of the lxml package to avoid having to specify the namespaces every time.
 		Handles the empty result cases, where instead of an empty list returns None.
 		Also handles nullable and singleton constraints set by the user.
+
 		:param query: Xpath query string.
 		:param nullable: Boolean indicating whether the result can be None, defaults to True.
 		:param singleton: Boolean indicating whether the result should only yield no results or one result, defaults to False.
@@ -52,10 +53,12 @@ class OoxmlElement(ArbitraryBaseModel):
 	
 	# TODO: maybe to not have to do this weird casting thing for attributes create wrapper function to access attributes
 	def _cast_xpath_query_result(self, query_result_element: Any) -> XpathQueryResult:
-		"""_summary_
+		"""
+		Cast xpath query result to the appropriate OoxmlElement class if eligible.
+		Necessary because when xpath is used to search attributes it does not return the XML element but the content itself.
 
-		:param query_result_element: _description_
-		:return: _description_
+		:param query_result_element: Raw xpath query result.
+		:return: Casted xpath query result.
 		"""
 		if isinstance(query_result_element, etreeElement):
 			return OoxmlElement(element=query_result_element)
@@ -72,7 +75,7 @@ class OoxmlElement(ArbitraryBaseModel):
 		return etree.tostring(self.element, pretty_print=True, encoding="utf-8").decode("utf-8")
 
 
-#
+# Auxiliary type for the result of the .xpath_query method
 XpathQueryResult = Optional[OoxmlElement | list[OoxmlElement] | Any]
 
 
@@ -87,7 +90,6 @@ class OoxmlPart(ArbitraryBaseModel):
 	def load(cls, name: str, content: str) -> OoxmlPart:
 		"""
 		Initializes an OOXML part with the content of a OOXML file (.xml).
-
 		:param name: The name of the OOXML part. Removing file extension if necessary.
 		:param content: String representation of the OOXML.
 		"""
@@ -110,7 +112,6 @@ class OoxmlPackage(ArbitraryBaseModel):
 	def load(cls, name: str, content: dict[str, str]) -> OoxmlPackage:
 		"""
 		Initializes an OOXML package with the given name and OOXML contents.
-
 		:param name: The name of the OOXML package.
 		:param content: Dictionary representation of the OOXML content inside the OOXML package.
 		 - Keys: OOXML file part root path name (split by '/').
@@ -149,7 +150,6 @@ class OoxmlPackage(ArbitraryBaseModel):
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
 		"""
 		Computes string representation of a package.
-
 		:param depth: Indentation depth integer, defaults to 0.
 		:param last: Package is the last one from the parent packages list, defaults to False.
 		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
