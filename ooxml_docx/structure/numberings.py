@@ -269,7 +269,7 @@ class Numbering(OoxmlElement):
 		:param ooxml_numbering: _description_
 		:return: _description_
 		"""
-		abstract_numbering: AbstractNumbering =cls._parse_abstract_numbering(
+		abstract_numbering: AbstractNumbering = cls._parse_abstract_numbering(
 				ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings
 		)
 		

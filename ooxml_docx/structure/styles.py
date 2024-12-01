@@ -7,13 +7,16 @@ from utils.pydantic import ArbitraryBaseModel
 import re
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties, NumberingProperties
+from ooxml_docx.structure.properties import (
+	RunProperties, ParagraphProperties, 
+	TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties,
+	NumberingProperties
+)
 
 
 class Style(OoxmlElement):
-	"""_summary_
+	"""
 
-	:return: _description_
 	"""
 	id: str
 	name: Optional[str] = None

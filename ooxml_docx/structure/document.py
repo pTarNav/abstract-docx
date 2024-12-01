@@ -1,11 +1,15 @@
 from __future__ import annotations
 from typing import Optional
-from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, TableProperties, TableRowProperties, TableCellProperties
+from ooxml_docx.structure.properties import (
+	RunProperties, ParagraphProperties, 
+	TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties,
+	NumberingProperties
+)
 from ooxml_docx.structure.styles import RunStyle, ParagraphStyle, TableStyle, OoxmlStyles, OoxmlStyleTypes
 from ooxml_docx.structure.numberings import NumberingStyle, Numbering
+
 
 class RunContent(OoxmlElement):
 	text: str

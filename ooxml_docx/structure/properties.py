@@ -8,7 +8,7 @@ class OoxmlProperties(OoxmlElement):
 	 it is helpful to have a general class that will enforce tag validation.
 	
 	Instead of needing to specify the fields for each type of properties element, store as the whole OOXML element.
-	Avoids OOXML versioning problems, as properties child elements are the most changed between different versions.
+	Avoids OOXML versioning problems, as properties child elements are the most changed between different OOXML versions.
 	
 	:raises ValueError: Raises error if tag validation is failed.
 	"""
