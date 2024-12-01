@@ -10,6 +10,9 @@ from ooxml_docx.structure.styles import RunStyle, ParagraphStyle, TableStyle, Oo
 class RunContent(OoxmlElement):
 	text: str
 
+	def __str__(self) -> str:
+		return self.text
+
 
 SPECIAL_RUN_TEXT_TAGS: list[str] = ["br", "cr", "sym", "tab", "noBreakHyphen", "softHyphen"]
 
@@ -135,7 +138,52 @@ class Run(OoxmlElement):
 		raise ValueError("")  # TODO
 	
 	def __str__(self) -> str:
-		return f"{{[{', '.join([repr(element.text) for element in self.content])}], }}"
+		return self._tree_str_()
+	
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		"""
+		Computes string representation of a paragraph.
+
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Paragraph is the last one from the parent element list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Package string representation.
+		"""
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of package header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		
+		s = f"{arrow}"
+		if self.style is not None:
+			s += f" [\033[1m{self.style.id}\033[0m]"
+		s += f" {''.join([repr(element.__str__()) for element in self.content])}\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+		
+		if len(self.content) > 1:
+			# Compute string representation of content
+			prefix = " "
+			for level_state in line_state:
+				prefix += "\u2502    " if level_state else "     "
+			for i, element in enumerate(self.content):
+				arrow = prefix + "\u2514\u2500\u2500\u25BA" if i == len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
+				s += f"{arrow} {repr(element.__str__())}\n"
+
+		return s
 
 class Hyperlink(OoxmlElement):
 	miau: str
@@ -208,6 +256,53 @@ class Paragraph(OoxmlElement):
 
 		raise ValueError("")  # TODO
 
+	def __str__(self) -> str:
+		return self._tree_str_()
+
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		"""
+		Computes string representation of a paragraph.
+
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Paragraph is the last one from the parent element list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Package string representation.
+		"""
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of package header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+
+		s = f"{arrow}"
+		if self.style is not None:
+			s += f" [\033[1m{self.style.id}\033[0m]"
+		s += " '"
+		for element in self.content:
+			s += "".join([_element.__str__() for _element in element.content])
+		s += "'\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of content
+		for i, element in enumerate(self.content):
+			s += element._tree_str_(
+				depth=depth+1, last=i==len(self.content)-1, line_state=line_state[:]  # Pass-by-value
+			)
+
+		return s
 
 class TableCell(OoxmlElement):
 	content: list[Paragraph | Table] = []
@@ -233,6 +328,12 @@ class Table(OoxmlElement):
 		:return: _description_
 		"""
 		return cls(element=ooxml_table.element)
+	
+	def __str__(self) -> str:
+		return ""
+	
+	def _tree_str_(self, depth: int, last: bool) -> str:
+		return ""
 
 
 class OoxmlDocument(OoxmlElement):
@@ -277,5 +378,10 @@ class OoxmlDocument(OoxmlElement):
 				
 		return content
 		
-
+	def __str__(self) -> str:
+		s = "\033[36m\033[1mBody\033[0m\n"
+		for i, element in enumerate(self.body):
+			s += element._tree_str_(depth=1, last=i==len(self.body)-1)
+		
+		return s
 
