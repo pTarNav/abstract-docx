@@ -4,7 +4,7 @@ from typing import Optional
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import (
 	RunProperties, ParagraphProperties, 
-	TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties,
+	TableProperties, TableRowProperties, TableCellProperties,
 	NumberingProperties
 )
 from ooxml_docx.structure.styles import RunStyle, ParagraphStyle, TableStyle, OoxmlStyles, OoxmlStyleTypes
@@ -88,7 +88,7 @@ class Run(OoxmlElement):
 		:param ooxml_run: _description_
 		:return: _description_
 		"""
-		properties: Optional[RunProperties] = ooxml_run.xpath_query(query="./rPr", singleton=True)
+		properties: Optional[RunProperties] = ooxml_run.xpath_query(query="./w:rPr", singleton=True)
 
 		return cls(
 			element=ooxml_run.element,
@@ -207,7 +207,7 @@ class Paragraph(OoxmlElement):
 		:param ooxml_paragraph: _description_
 		:return: _description_
 		"""
-		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./pPr", singleton=True)
+		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./w:pPr", singleton=True)
 
 		return cls(
 			element=ooxml_paragraph.element,
