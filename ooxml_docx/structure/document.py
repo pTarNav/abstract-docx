@@ -88,7 +88,7 @@ class Run(OoxmlElement):
 		:param ooxml_run: _description_
 		:return: _description_
 		"""
-		properties: Optional[RunProperties] = ooxml_run.xpath_query(query="./w:rPr", singleton=True)
+		properties: Optional[OoxmlElement] = ooxml_run.xpath_query(query="./w:rPr", singleton=True)
 
 		return cls(
 			element=ooxml_run.element,
@@ -207,7 +207,7 @@ class Paragraph(OoxmlElement):
 		:param ooxml_paragraph: _description_
 		:return: _description_
 		"""
-		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./w:pPr", singleton=True)
+		properties: Optional[OoxmlElement] = ooxml_paragraph.xpath_query(query="./w:pPr", singleton=True)
 
 		return cls(
 			element=ooxml_paragraph.element,
@@ -314,23 +314,25 @@ class Paragraph(OoxmlElement):
 		return s
 
 class TableCell(OoxmlElement):
-	loc: tuple[int, int]
-
 	content: list[Paragraph | Table] = []
 	properties: Optional[TableCellProperties] = None
 
+	loc: Optional[tuple[int, int]] = None
+
 	@classmethod
-	def parse(cls, loc: tuple[int, int], ooxml_cell: OoxmlElement, styles: OoxmlStyles) -> TableCell:
+	def parse(cls, ooxml_cell: OoxmlElement, styles: OoxmlStyles, loc: Optional[tuple[int, int]] = None) -> TableCell:
 		"""_summary_
 
 		:param ooxml_cell: _description_
 		:return: _description_
 		"""
+		properties: Optional[OoxmlElement] = ooxml_cell.xpath_query(query="./w:tcPr", singleton=True)
 
 		return cls(
 			element=ooxml_cell.element,
-			loc=loc,
-			content=cls._parse_content(ooxml_cell=ooxml_cell, styles=styles)
+			content=cls._parse_content(ooxml_cell=ooxml_cell, styles=styles),
+			properties=TableCellProperties(ooxml=properties) if properties is not None else None,
+			loc=loc
 		)
 	
 	@staticmethod
@@ -389,26 +391,29 @@ class TableCell(OoxmlElement):
 		return s	
 
 class TableRow(OoxmlElement):
-	loc: int
 	cells: list[TableCell] = []
 	properties: Optional[TableRowProperties] = None
 
+	loc: Optional[int] = None
+
 	@classmethod
-	def parse(cls, loc: int, ooxml_row: OoxmlElement, styles: OoxmlStyles) -> TableRow:
+	def parse(cls, ooxml_row: OoxmlElement, styles: OoxmlStyles, loc: Optional[int] = None) -> TableRow:
 		"""_summary_
 
 		:param ooxml_row: _description_
 		:return: _description_
 		"""
-
+		properties: Optional[OoxmlElement] = ooxml_row.xpath_query(query="./w:trPr", singleton=True)
+		
 		return cls(
 			element=ooxml_row.element,
-			loc=loc,
-			cells=cls._parse_cells(loc=loc, ooxml_row=ooxml_row, styles=styles)
+			cells=cls._parse_cells(ooxml_row=ooxml_row, styles=styles, loc=loc),
+			properties=TableRowProperties(ooxml=properties) if properties is not None else None,
+			loc=loc
 		)
 	
 	@staticmethod
-	def _parse_cells(loc: int, ooxml_row: OoxmlElement, styles: OoxmlStyles) -> list[TableCell]:
+	def _parse_cells(ooxml_row: OoxmlElement, styles: OoxmlStyles, loc: int) -> list[TableCell]:
 		"""_summary_
 
 		:param ooxml_row: _description_
@@ -420,7 +425,7 @@ class TableRow(OoxmlElement):
 		
 		cells: list[TableCell] = []
 		for i, ooxml_cell in enumerate(ooxml_cells):
-			cells.append(TableCell.parse(loc=(loc, i), ooxml_cell=ooxml_cell, styles=styles))
+			cells.append(TableCell.parse(ooxml_cell=ooxml_cell, styles=styles, loc=(loc, i)))
 		
 		return cells
 
@@ -450,7 +455,6 @@ class TableRow(OoxmlElement):
 
 		# Compute string representation of cells
 		for i, cell in enumerate(self.cells):
-			print(i, cell)
 			s += cell._tree_str_(depth=depth+1, last=i==len(self.cells)-1, line_state=line_state[:])  # Pass-by-value
 
 		return s
@@ -469,8 +473,12 @@ class Table(OoxmlElement):
 		:param ooxml_table: _description_
 		:return: _description_
 		"""
+		properties: Optional[OoxmlElement] = ooxml_table.xpath_query(query="./w:tblPr", singleton=True)
+		
 		return cls(
-			element=ooxml_table.element, rows=cls._parse_rows(ooxml_table=ooxml_table, styles=styles)
+			element=ooxml_table.element, rows=cls._parse_rows(ooxml_table=ooxml_table, styles=styles),
+			properties=TableProperties(ooxml=properties) if properties is not None else None,
+			style=cls._parse_style(ooxml_table=ooxml_table, styles=styles)
 		)
 	
 	@staticmethod
@@ -486,9 +494,29 @@ class Table(OoxmlElement):
 		
 		rows: list[TableRow] = []
 		for i, ooxml_row in enumerate(ooxml_rows):
-			rows.append(TableRow.parse(loc=i, ooxml_row=ooxml_row, styles=styles))
+			rows.append(TableRow.parse(ooxml_row=ooxml_row, styles=styles, loc=i))
 		
 		return rows
+	
+	@staticmethod
+	def _parse_style(ooxml_table: OoxmlElement, styles: OoxmlStyles) -> Optional[TableStyle]:
+		"""_summary_
+
+		:param ooxml_table: _description_
+		:param styles: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		style_id: Optional[str] = ooxml_table.xpath_query(query="./w:pPr/w:tblStyle/@w:val", singleton=True)
+		if style_id is None:
+			return None
+		style_id = str(style_id)
+
+		table_style_search_result: Optional[TableStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.TABLE)
+		if table_style_search_result is not None:
+			return table_style_search_result
+
+		raise ValueError(f"Undefined style reference for style id: {style_id}")
 
 	def __str__(self) -> str:
 		return ""
@@ -505,7 +533,10 @@ class Table(OoxmlElement):
 			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
 			if depth > 0 else ""
 		)
-		s = f"{arrow} \033[1mTable\033[0m\n"
+		s = f"{arrow} \033[1mTable\033[0m"
+		if self.caption is not None:
+			s += f" '{self.caption}'"
+		s += "\n"
 
 		# Update the line state for the current depth
 		if depth > 0:
@@ -516,7 +547,7 @@ class Table(OoxmlElement):
 
 		# Compute string representation of rows
 		for i, row in enumerate(self.rows):
-			s += row._tree_str_(depth=depth + 1, last=i == len(self.rows) - 1, line_state=line_state[:])  # Pass-by-value
+			s += row._tree_str_(depth=depth+1, last=i==len(self.rows)-1, line_state=line_state[:])  # Pass-by-value
 
 		return s
 
