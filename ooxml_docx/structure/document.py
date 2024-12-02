@@ -166,7 +166,7 @@ class Run(OoxmlElement):
 			if depth > 0 else ""
 		)
 		
-		s = f"{arrow}"
+		s = f"{arrow} "
 		if self.style is not None:
 			s += f" [\033[1m{self.style.id}\033[0m]"
 		s += f" {''.join([repr(element.__str__()) for element in self.content])}\n"
@@ -314,13 +314,146 @@ class Paragraph(OoxmlElement):
 		return s
 
 class TableCell(OoxmlElement):
+	loc: tuple[int, int]
+
 	content: list[Paragraph | Table] = []
 	properties: Optional[TableCellProperties] = None
 
+	@classmethod
+	def parse(cls, loc: tuple[int, int], ooxml_cell: OoxmlElement, styles: OoxmlStyles) -> TableCell:
+		"""_summary_
+
+		:param ooxml_cell: _description_
+		:return: _description_
+		"""
+
+		return cls(
+			element=ooxml_cell.element,
+			loc=loc,
+			content=cls._parse_content(ooxml_cell=ooxml_cell, styles=styles)
+		)
+	
+	@staticmethod
+	def _parse_content(ooxml_cell: OoxmlElement, styles: OoxmlStyles) -> list[Paragraph | Table]:
+		"""_summary_
+
+		:param ooxml_cell: _description_
+		:return: _description_
+		"""
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_cell.xpath_query(query="./w:p | ./w:tbl")
+		if ooxml_content is None:
+			return []
+		
+		content: list[Paragraph | Table] = []
+		if ooxml_content is not None:
+			for ooxml_element in ooxml_content:
+				match ooxml_element.local_name:
+					case "p":
+						element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
+					case "tbl":
+						element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
+					case _:
+						raise ValueError("")  # TODO
+				content.append(element)
+		
+		return content
+
+	def __str__(self) -> str:
+		return ""
+
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of cell header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		s = f"{arrow} \033[1mCell\033[0m: {self.loc}\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of content
+		for i, element in enumerate(self.content):
+			s += element._tree_str_(depth=depth+1, last=i==len(self.content)-1, line_state=line_state[:])  # Pass-by-value
+
+		return s	
 
 class TableRow(OoxmlElement):
-	cells: list[TableCell]
+	loc: int
+	cells: list[TableCell] = []
 	properties: Optional[TableRowProperties] = None
+
+	@classmethod
+	def parse(cls, loc: int, ooxml_row: OoxmlElement, styles: OoxmlStyles) -> TableRow:
+		"""_summary_
+
+		:param ooxml_row: _description_
+		:return: _description_
+		"""
+
+		return cls(
+			element=ooxml_row.element,
+			loc=loc,
+			cells=cls._parse_cells(loc=loc, ooxml_row=ooxml_row, styles=styles)
+		)
+	
+	@staticmethod
+	def _parse_cells(loc: int, ooxml_row: OoxmlElement, styles: OoxmlStyles) -> list[TableCell]:
+		"""_summary_
+
+		:param ooxml_row: _description_
+		:return: _description_
+		"""
+		ooxml_cells: Optional[list[OoxmlElement]] = ooxml_row.xpath_query(query="./w:tc")
+		if ooxml_cells is None:
+			return []
+		
+		cells: list[TableCell] = []
+		for i, ooxml_cell in enumerate(ooxml_cells):
+			cells.append(TableCell.parse(loc=(loc, i), ooxml_cell=ooxml_cell, styles=styles))
+		
+		return cells
+
+	def __str__(self) -> str:
+		return ""	
+
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of row header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		s = f"{arrow} \033[1mRow\033[0m: {self.loc}\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of cells
+		for i, cell in enumerate(self.cells):
+			print(i, cell)
+			s += cell._tree_str_(depth=depth+1, last=i==len(self.cells)-1, line_state=line_state[:])  # Pass-by-value
+
+		return s
 
 
 class Table(OoxmlElement):
@@ -330,19 +463,62 @@ class Table(OoxmlElement):
 	style: Optional[TableStyle] = None
 
 	@classmethod
-	def parse(cls, ooxml_table: OoxmlElement) -> Table:
+	def parse(cls, ooxml_table: OoxmlElement, styles: OoxmlStyles) -> Table:
 		"""_summary_
 
 		:param ooxml_table: _description_
 		:return: _description_
 		"""
-		return cls(element=ooxml_table.element)
+		return cls(
+			element=ooxml_table.element, rows=cls._parse_rows(ooxml_table=ooxml_table, styles=styles)
+		)
 	
+	@staticmethod
+	def _parse_rows(ooxml_table: OoxmlElement, styles: OoxmlStyles) -> list[TableRow]:
+		"""_summary_
+
+		:param ooxml_table: _description_
+		:return: _description_
+		"""
+		ooxml_rows: Optional[list[OoxmlElement]] = ooxml_table.xpath_query(query="./w:tr")
+		if ooxml_rows is None:
+			return []
+		
+		rows: list[TableRow] = []
+		for i, ooxml_row in enumerate(ooxml_rows):
+			rows.append(TableRow.parse(loc=i, ooxml_row=ooxml_row, styles=styles))
+		
+		return rows
+
 	def __str__(self) -> str:
 		return ""
 	
-	def _tree_str_(self, depth: int, last: bool) -> str:
-		return ""
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of table header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		s = f"{arrow} \033[1mTable\033[0m\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of rows
+		for i, row in enumerate(self.rows):
+			s += row._tree_str_(depth=depth + 1, last=i == len(self.rows) - 1, line_state=line_state[:])  # Pass-by-value
+
+		return s
 
 
 class OoxmlDocument(OoxmlElement):
@@ -372,15 +548,16 @@ class OoxmlDocument(OoxmlElement):
 		if ooxml_body is None:
 			return []
 
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_body.xpath_query(query="./w:p | ./w:tbl")
+		
 		content: list[Paragraph | Table] = []
-		ooxml_content: Optional[OoxmlElement] = ooxml_body.xpath_query(query="./w:p | ./w:tbl")
 		if ooxml_content is not None:
 			for ooxml_element in ooxml_content:
 				match ooxml_element.local_name:
 					case "p":
 						element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
 					case "tbl":
-						element: Table = Table.parse(ooxml_table=ooxml_element)
+						element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
 					case _:
 						raise ValueError("")  # TODO
 				content.append(element)
