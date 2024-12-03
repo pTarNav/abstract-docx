@@ -4,6 +4,7 @@ from enum import Enum
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
+from ooxml_docx.relationships import OoxmlRelationships
 from ooxml_docx.structure.properties import (
 	RunProperties, ParagraphProperties, 
 	TableProperties, TableConditionalProperties, TableRowProperties, TableCellProperties,
@@ -241,17 +242,18 @@ class Hyperlink(OoxmlElement):
 	target: Optional[str | Bookmark] = None
 
 	@classmethod
-	def parse(cls, ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles) -> Hyperlink:
+	def parse(cls, ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Hyperlink:
 		"""_summary_
 
 		:param ooxml_hyperlink: _description_
 		:return: _description_
 		"""
+		target_type: OoxmlHyperlinkType = cls._parse_type(ooxml_hyperlink=ooxml_hyperlink)
 
 		return cls(
 			element=ooxml_hyperlink.element,
 			content=cls._parse_content(ooxml_hyperlink=ooxml_hyperlink, styles=styles),
-			type=cls._parse_type(ooxml_hyperlink=ooxml_hyperlink)
+			type=target_type
 		)
 	
 	@staticmethod
@@ -272,7 +274,6 @@ class Hyperlink(OoxmlElement):
 		
 		return content
 
-	
 	@staticmethod
 	def _parse_type(ooxml_hyperlink: OoxmlElement) -> OoxmlHyperlinkType:
 		"""_summary_
@@ -291,6 +292,21 @@ class Hyperlink(OoxmlElement):
 
 		raise ValueError("Undefined hyperlink type, cannot find target id reference")
 
+	@staticmethod
+	def _parse_target(
+		ooxml_hyperlink: OoxmlElement, type: OoxmlHyperlinkType, relationships: OoxmlRelationships
+	) -> Optional[str | Bookmark]:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:return: _description_
+		"""
+		if type == OoxmlHyperlinkType.external:
+			relationship_id: str = str(ooxml_hyperlink.xpath_query(query="./@r:id", nullable=False, singleton=True))
+			return relationships.content[relationship_id].target
+		elif type == OoxmlHyperlinkType.internal:
+			return None
+
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
 		return "hyperlink"
 
@@ -302,7 +318,7 @@ class Paragraph(OoxmlElement):
 	numbering: Optional[Numbering] = None
 
 	@classmethod
-	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> Paragraph:
+	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Paragraph:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
@@ -310,15 +326,17 @@ class Paragraph(OoxmlElement):
 		"""
 		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./pPr", singleton=True)
 
-		paragraph: Paragraph = cls(
+		return cls(
 			element=ooxml_paragraph.element,
-			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles),
+			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles, relationships=relationships),
 			properties=ParagraphProperties(ooxml=properties) if properties is not None else None,
 			style=cls._parse_style(ooxml_paragraph=ooxml_paragraph, styles=styles)
 		)
 
 	@staticmethod
-	def _parse_content(ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> list[Run | Hyperlink]:
+	def _parse_content(
+		ooxml_paragraph: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships
+	) -> list[Run | Hyperlink]:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
@@ -333,14 +351,15 @@ class Paragraph(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			match ooxml_element.local_name:
 				case "r":
-					run: Run = Run.parse(ooxml_run=ooxml_element, styles=styles)
-					content.append(run)
+					element: Run = Run.parse(ooxml_run=ooxml_element, styles=styles)
 				case "hyperlink":
-					hyperlink: Hyperlink = Hyperlink.parse(ooxml_hyperlink=ooxml_element, styles=styles)
-					content.append(hyperlink)
+					element: Hyperlink = Hyperlink.parse(
+						ooxml_hyperlink=ooxml_element, styles=styles, relationships=relationships
+					)
 				case _:
+					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
-			
+			content.append(element)
 		
 		return content
 
@@ -452,7 +471,7 @@ class OoxmlDocument(OoxmlElement):
 	body: list[Paragraph | Table] = []
 
 	@classmethod
-	def build(cls, ooxml_document_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlDocument:
+	def build(cls, ooxml_document_part: OoxmlPart, styles: OoxmlStyles, relationships: OoxmlRelationships) -> OoxmlDocument:
 		"""_summary_
 
 		:param ooxml_document_part: _description_
@@ -461,11 +480,11 @@ class OoxmlDocument(OoxmlElement):
 
 		return cls(
 			element=ooxml_document_part.ooxml.element,
-			body=cls._parse_body(ooxml_document_part=ooxml_document_part, styles=styles)
+			body=cls._parse_body(ooxml_document_part=ooxml_document_part, styles=styles, relationships=relationships)
 		)
 	
 	@staticmethod
-	def _parse_body(ooxml_document_part: OoxmlPart, styles: OoxmlStyles) -> list[Paragraph | Table]:
+	def _parse_body(ooxml_document_part: OoxmlPart, styles: OoxmlStyles, relationships: OoxmlRelationships) -> list[Paragraph | Table]:
 		"""_summary_
 
 		:param ooxml_document_part: _description_
@@ -483,14 +502,13 @@ class OoxmlDocument(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			match ooxml_element.local_name:
 				case "p":
-					paragraph: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
-					content.append(paragraph)
+					element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles, relationships=relationships)
 				case "tbl":
-					table: Table = Table.parse(ooxml_table=ooxml_element)
-					content.append(table)
+					element: Table = Table.parse(ooxml_table=ooxml_element)
 				case _:
 					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
+			content.append(element)
 			
 		return content
 

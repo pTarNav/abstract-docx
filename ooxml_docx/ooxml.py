@@ -35,7 +35,10 @@ class OoxmlElement(ArbitraryBaseModel):
 		:return: Xpath query results, None when the result is empty.
 		:raises ValueError: Raises error if nullable or single constraints are failed.
 		"""
-		query_result: list[etreeElement] = self.element.xpath(query, namespaces=self.element.nsmap)
+		query_result: list[etreeElement] = self.element.xpath(
+			query,
+			namespaces=self.element.nsmap if None not in self.element.nsmap.keys() else {}
+		)
 		
 		if len(query_result) == 0:
 			if not nullable:
