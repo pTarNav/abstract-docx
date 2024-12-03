@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Optional
+from enum import Enum
+from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import (
@@ -76,7 +78,7 @@ class RunText(RunContent):
 
 
 class Run(OoxmlElement):
-	content: list[RunContent]
+	content: list[RunContent] = []
 	
 	properties: Optional[RunProperties] = None
 	style: Optional[RunStyle] = None
@@ -189,9 +191,108 @@ class Run(OoxmlElement):
 
 		return s
 
-class Hyperlink(OoxmlElement):
-	miau: str
 
+class OoxmlHyperlinkType(Enum):
+	internal = "INTERNAL"
+	external = "EXTERNAL"
+
+
+class BookmarkDelimiter(ArbitraryBaseModel):
+	parent: Optional[OoxmlElement] = None
+	previous: Optional[OoxmlElement] = None
+
+
+class Bookmark(OoxmlElement):
+	id: int  # Id is just used to relate <w:bookmarkStart> and <w:bookmarkEnd> elements
+	name: str  # Actual id used to reference the bookmark, contained in <w:bookmarkStart>
+	
+	start_delimiter: Optional[BookmarkDelimiter] = None
+	# Empty while the <w:bookmarkEnd> element has not been found yet, should not remain empty after the document is parsed
+	end_delimiter: Optional[BookmarkDelimiter] = None
+
+	@classmethod
+	def start(cls, ooxml_bookmark_start: OoxmlElement) -> Bookmark:
+		"""_summary_
+
+		:param ooxml_bookmark_start: _description_
+		:return: _description_
+		"""
+		return cls(
+			element=ooxml_bookmark_start.element,
+			id=int(ooxml_bookmark_start.xpath_query(query="./@w:id", nullable=False, singleton=True)),
+			name=str(ooxml_bookmark_start.xpath_query(query="./@w:name", nullable=False, singleton=True))
+		)
+	
+	@classmethod
+	def end(cls, ooxml_bookmark_end: OoxmlElement) -> int:
+		"""_summary_
+
+		:param ooxml_bookmark_end: _description_
+		:return: _description_
+		"""
+		return int(ooxml_bookmark_end.xpath_query(query="./@w:id", nullable=False, singleton=True))
+
+
+class Hyperlink(OoxmlElement):
+	content: list[Run] = []
+	type: OoxmlHyperlinkType
+
+	#  
+	target: Optional[str | Bookmark] = None
+
+	@classmethod
+	def parse(cls, ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles) -> Hyperlink:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:return: _description_
+		"""
+
+		return cls(
+			element=ooxml_hyperlink.element,
+			content=cls._parse_content(ooxml_hyperlink=ooxml_hyperlink, styles=styles),
+			type=cls._parse_type(ooxml_hyperlink=ooxml_hyperlink)
+		)
+	
+	@staticmethod
+	def _parse_content(ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles) -> list[Run]:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		ooxml_runs: Optional[list[OoxmlElement]] = ooxml_hyperlink.xpath_query(query="./w:r")
+		if ooxml_runs is None:
+			return []
+		
+		content: list[Run] = []
+		for ooxml_run in ooxml_runs:
+			content.append(Run.parse(ooxml_run=ooxml_run, styles=styles))
+		
+		return content
+
+	
+	@staticmethod
+	def _parse_type(ooxml_hyperlink: OoxmlElement) -> OoxmlHyperlinkType:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		relationship_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@r:id", singleton=True)
+		if relationship_id is not None:
+			return OoxmlHyperlinkType.external
+		
+		anchor_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@w:anchor", singleton=True)
+		if anchor_id is not None:
+			return OoxmlHyperlinkType.internal
+
+		raise ValueError("Undefined hyperlink type, cannot find target id reference")
+
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		return "hyperlink"
 
 class Paragraph(OoxmlElement):
 	content: list[Run | Hyperlink] = []
@@ -209,7 +310,7 @@ class Paragraph(OoxmlElement):
 		"""
 		properties: Optional[ParagraphProperties] = ooxml_paragraph.xpath_query(query="./pPr", singleton=True)
 
-		return cls(
+		paragraph: Paragraph = cls(
 			element=ooxml_paragraph.element,
 			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles),
 			properties=ParagraphProperties(ooxml=properties) if properties is not None else None,
@@ -224,7 +325,7 @@ class Paragraph(OoxmlElement):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./w:r | ./w:hyperlink")
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./*[not(self::w:pPr or self::w:bookmarkStart or self::w:bookmarkEnd)]")
 		if ooxml_content is None:
 			return []
 		
@@ -232,12 +333,14 @@ class Paragraph(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			match ooxml_element.local_name:
 				case "r":
-					element: Run = Run.parse(ooxml_run=ooxml_element, styles=styles)
+					run: Run = Run.parse(ooxml_run=ooxml_element, styles=styles)
+					content.append(run)
 				case "hyperlink":
-					continue
+					hyperlink: Hyperlink = Hyperlink.parse(ooxml_hyperlink=ooxml_element, styles=styles)
+					content.append(hyperlink)
 				case _:
-					raise ValueError("")  # TODO
-			content.append(element)
+					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
+			
 		
 		return content
 
@@ -355,7 +458,7 @@ class OoxmlDocument(OoxmlElement):
 		:param ooxml_document_part: _description_
 		:return: _description_
 		"""
-		
+
 		return cls(
 			element=ooxml_document_part.ooxml.element,
 			body=cls._parse_body(ooxml_document_part=ooxml_document_part, styles=styles)
@@ -372,21 +475,24 @@ class OoxmlDocument(OoxmlElement):
 		if ooxml_body is None:
 			return []
 
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_body.xpath_query(query="./*[not(self::w:bookmarkStart or self::w:bookmarkEnd)]")
+		if ooxml_content is None:
+			return []
+
 		content: list[Paragraph | Table] = []
-		ooxml_content: Optional[OoxmlElement] = ooxml_body.xpath_query(query="./w:p | ./w:tbl")
-		if ooxml_content is not None:
-			for ooxml_element in ooxml_content:
-				match ooxml_element.local_name:
-					case "p":
-						element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
-					case "tbl":
-						element: Table = Table.parse(ooxml_table=ooxml_element)
-					case _:
-						raise ValueError("")  # TODO
-				content.append(element)
-				
+		for ooxml_element in ooxml_content:
+			match ooxml_element.local_name:
+				case "p":
+					paragraph: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
+					content.append(paragraph)
+				case "tbl":
+					table: Table = Table.parse(ooxml_table=ooxml_element)
+					content.append(table)
+				case _:
+					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
+			
 		return content
-		
+
 	def __str__(self) -> str:
 		s = "\033[36m\033[1mBody\033[0m\n"
 		for i, element in enumerate(self.body):
