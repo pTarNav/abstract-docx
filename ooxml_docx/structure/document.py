@@ -489,6 +489,7 @@ class OoxmlDocument(OoxmlElement):
 					table: Table = Table.parse(ooxml_table=ooxml_element)
 					content.append(table)
 				case _:
+					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
 			
 		return content
