@@ -169,10 +169,7 @@ class Run(OoxmlElement):
 			if depth > 0 else ""
 		)
 		
-		s = f"{arrow}"
-		if self.style is not None:
-			s += f" [\033[1m{self.style.id}\033[0m]"
-		s += f" {''.join([repr(element.__str__()) for element in self.content])}\n"
+		s = f"{arrow} \033[1mRUN\033[0m\n"
 
 		# Update the line state for the current depth
 		if depth > 0:
@@ -181,14 +178,31 @@ class Run(OoxmlElement):
 			else:
 				line_state[depth] = not last
 		
-		if len(self.content) > 1:
-			# Compute string representation of content
-			prefix = " "
-			for level_state in line_state:
-				prefix += "\u2502    " if level_state else "     "
-			for i, element in enumerate(self.content):
-				arrow = prefix + "\u2514\u2500\u2500\u25BA" if i == len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
-				s += f"{arrow} {repr(element.__str__())}\n"
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + "\u251c\u2500\u2500\u25BA"
+		
+		if self.style is not None:
+			s += f"{arrow} \033[1mstyle\033[0m: {self.style.id}\n"
+		
+		arrow = prefix + "\u2514\u2500\u2500\u25BA"
+		s += f"{arrow} \033[1mcontent\033[0m:\n"
+		
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of content
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		for i, element in enumerate(self.content):
+			arrow = prefix + "\u2514\u2500\u2500\u25BA" if i==len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
+			s += f"{arrow} {repr(element.__str__())}\n"
 
 		return s
 
@@ -253,7 +267,8 @@ class Hyperlink(OoxmlElement):
 		return cls(
 			element=ooxml_hyperlink.element,
 			content=cls._parse_content(ooxml_hyperlink=ooxml_hyperlink, styles=styles),
-			type=target_type
+			type=target_type,
+			target=cls._parse_target(ooxml_hyperlink=ooxml_hyperlink, type=target_type, relationships=relationships)
 		)
 	
 	@staticmethod
@@ -302,13 +317,64 @@ class Hyperlink(OoxmlElement):
 		:return: _description_
 		"""
 		if type == OoxmlHyperlinkType.external:
+			print(relationships.content)
 			relationship_id: str = str(ooxml_hyperlink.xpath_query(query="./@r:id", nullable=False, singleton=True))
 			return relationships.content[relationship_id].target
 		elif type == OoxmlHyperlinkType.internal:
 			return None
 
+	def __str__(self) -> str:
+		return self._tree_str_()
+	
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		return "hyperlink"
+		"""
+		Computes string representation of a paragraph.
+
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Paragraph is the last one from the parent element list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Package string representation.
+		"""
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of package header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		
+		s = f"{arrow} \033[1mHYPERLINK\033[0m\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+		
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + "\u251c\u2500\u2500\u25BA"
+		
+		s += f"{arrow} \033[1mtype\033[0m: {self.type.value}\n"
+		s += f"{arrow} \033[1mtarget\033[0m: {self.target}\n"
+
+		# Compute string representation of content
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		for i, element in enumerate(self.content):
+			s += element._tree_str_(
+				depth=depth+2, last=i==len(self.content)-1, line_state=line_state[:]  # Pass-by-value
+			)
+
+		return s
 
 class Paragraph(OoxmlElement):
 	content: list[Run | Hyperlink] = []

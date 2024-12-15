@@ -42,8 +42,10 @@ class OoxmlRelationships(OoxmlElement):
 		:param ooxml_relationships: _description_
 		:return: _description_
 		"""
-		ooxml_relationships: Optional[list[OoxmlElement]] = ooxml_rels.xpath_query("./Relationship")
+		ooxml_relationships: Optional[list[OoxmlElement]] = ooxml_rels.xpath_query(query="./*[local-name()='Relationship']")
+		print(ooxml_relationships)
 		if ooxml_relationships is None:
+			print("empty rels")
 			return {}
 		
 		content: dict[str, Relationship] = {}
