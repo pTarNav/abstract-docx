@@ -344,19 +344,24 @@ class TableCell(OoxmlElement):
 		"""
 		ooxml_content: Optional[list[OoxmlElement]] = ooxml_cell.xpath_query(query="./w:p | ./w:tbl")
 		if ooxml_content is None:
+			# From the perspective of the use-case it does not make much sense to be able to have an empty document,
+			# however, it is still good to be able to pass an empty document through the pipeline,
+			# because it allows the user to parse the other kinds of docx data through this tool.
+			# "E.g. User wants to check and standardize the style hierarchy"
+			# Raises a warning instead of an error
+			print("\033[33mWarning: No textual content detected inside the document...\033[0m")
 			return []
 		
 		content: list[Paragraph | Table] = []
-		if ooxml_content is not None:
-			for ooxml_element in ooxml_content:
-				match ooxml_element.local_name:
-					case "p":
-						element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
-					case "tbl":
-						element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
-					case _:
-						raise ValueError("")  # TODO
-				content.append(element)
+		for ooxml_element in ooxml_content:
+			match ooxml_element.local_name:
+				case "p":
+					element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
+				case "tbl":
+					element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
+				case _:
+					raise ValueError("")  # TODO
+			content.append(element)
 		
 		return content
 
@@ -364,8 +369,7 @@ class TableCell(OoxmlElement):
 		return ""
 
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		if line_state is None:
-			line_state = []
+		line_state = line_state if line_state is not None else []
 		
 		# Compute string representation of cell header
 		prefix = " " if depth > 0 else ""
@@ -430,11 +434,10 @@ class TableRow(OoxmlElement):
 		return cells
 
 	def __str__(self) -> str:
-		return ""	
+		raise NotImplementedError("")
 
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		if line_state is None:
-			line_state = []
+		line_state = line_state if line_state is not None else []
 		
 		# Compute string representation of row header
 		prefix = " " if depth > 0 else ""
