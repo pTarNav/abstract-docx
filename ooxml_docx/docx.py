@@ -27,10 +27,8 @@ class OoxmlDocx(ArbitraryBaseModel):
 					# TODO: handle other file extensions inside the package
 					if f_name.endswith(".xml") or f_name.endswith(".rels"):
 						contents[f_name] = zip_ref.read(f_name)
-					
-		ooxml = OoxmlPackage.load(name=os.path.splitext(file_path)[0], content=contents)
-
-		return cls(file_path=file_path, ooxml=ooxml)
+		
+		return cls(file_path=file_path, ooxml=OoxmlPackage.load(name=os.path.splitext(file_path)[0], content=contents))
 	
 	def __str__(self):
 		s = f"\U0001F4D1 \033[36m\033[1m'{self.file_path}'\033[0m\n"
