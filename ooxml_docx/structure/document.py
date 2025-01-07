@@ -21,7 +21,7 @@ class RunContent(OoxmlElement):
 		return self.text
 
 
-SPECIAL_RUN_TEXT_TAGS: list[str] = ["br", "cr", "sym", "tab", "noBreakHyphen", "softHyphen"]
+RUN_SPECIAL_TEXT_TAGS: list[str] = ["br", "cr", "sym", "tab", "noBreakHyphen", "softHyphen"]
 
 
 class SpecialRunText(RunContent):
@@ -115,7 +115,7 @@ class Run(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			if ooxml_element.local_name == "t":
 				element: RunText = RunText.parse(ooxml_text=ooxml_element)
-			elif ooxml_element.local_name in SPECIAL_RUN_TEXT_TAGS:
+			elif ooxml_element.local_name in RUN_SPECIAL_TEXT_TAGS:
 				element: SpecialRunText = SpecialRunText.parse(ooxml_special_text=ooxml_element)
 			else:
 				print("found strange run content", ooxml_element.local_name)
@@ -532,12 +532,6 @@ class TableCell(OoxmlElement):
 		"""
 		ooxml_content: Optional[list[OoxmlElement]] = ooxml_cell.xpath_query(query="./w:p | ./w:tbl")
 		if ooxml_content is None:
-			# From the perspective of the use-case it does not make much sense to be able to have an empty document,
-			# however, it is still good to be able to pass an empty document through the pipeline,
-			# because it allows the user to parse the other kinds of docx data through this tool.
-			# "E.g. User wants to check and standardize the style hierarchy"
-			# Raises a warning instead of an error
-			print("\033[33mWarning: No textual content detected inside the document...\033[0m")
 			return []
 		
 		content: list[Paragraph | Table] = []
@@ -768,10 +762,17 @@ class OoxmlDocument(OoxmlElement):
 		"""
 		ooxml_body: Optional[OoxmlElement] = ooxml_document_part.ooxml.xpath_query(query="./w:body", singleton=True)
 		if ooxml_body is None:
-			return []
+			# The body OOXML element should still be found inside the document no matter the actual content written
+			raise ValueError("No <w:body> OOXML element found inside the document.")
 
 		ooxml_content: Optional[list[OoxmlElement]] = ooxml_body.xpath_query(query="./*[not(self::w:bookmarkStart or self::w:bookmarkEnd)]")
 		if ooxml_content is None:
+			# From the perspective of the use-case it does not make much sense to be able to have an empty document,
+			# however, it is still good to be able to pass an empty document through the pipeline,
+			# because it allows the user to parse the other kinds of docx data through this tool
+			# "E.g. User wants to check and standardize the style hierarchy"
+			# Raises a warning instead of an error
+			print("\033[33mWarning: No textual content detected inside the document...\033[0m")
 			return []
 
 		content: list[Paragraph | Table] = []
@@ -780,7 +781,7 @@ class OoxmlDocument(OoxmlElement):
 				case "p":
 					element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles, relationships=relationships)
 				case "tbl":
-					element: Table = Table.parse(ooxml_table=ooxml_element)
+					element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
 				case _:
 					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")

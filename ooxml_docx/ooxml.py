@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import Optional, Any
-from utils.pydantic import ArbitraryBaseModel
 
 from lxml import etree
 from lxml.etree import _Element as etreeElement
-
 import re
+
+from utils.pydantic import ArbitraryBaseModel
 
 
 class OoxmlElement(ArbitraryBaseModel):
@@ -62,7 +62,7 @@ class OoxmlElement(ArbitraryBaseModel):
 		 because if that is not the key it would actually violate namespace prefix uniqueness of the underlying XML.		
 		Decided to go with 'ens' (empty namespace) prefix as a general and neutral option for empty namespace prefix.
 
-		:returns:
+		:return: Namespace dictionary without empty namespace key.
 		:raises KeyError: If 'ens' is already being used as a prefix for another namespace.
 		"""
 		if None in self.element.nsmap.keys():
@@ -90,7 +90,6 @@ class OoxmlElement(ArbitraryBaseModel):
 			return OoxmlElement(element=query_result_element)
 		
 		return query_result_element
-
 
 	def __str__(self) -> str:
 		"""
@@ -128,7 +127,7 @@ class OoxmlPart(ArbitraryBaseModel):
 class OoxmlPackage(ArbitraryBaseModel):
 	"""
 	Represents an OOXML (Office Open XML) package, which can contain multiple parts and nested packages.
-	Can contain an associated package which specifies the relationships between parts ('_rels' file extension).
+	Can contain an associated package which specifies the relationships between parts ('.rels' file extension).
 	"""
 	name: str
 	content: dict[str, OoxmlPart | OoxmlPackage] = {}
@@ -164,6 +163,7 @@ class OoxmlPackage(ArbitraryBaseModel):
 		# Load subpackage levels into the initialized subpackage structures in the package level
 		for package_name, package_content in packages.items():
 			if package_name == "_rels":
+				# Relationships are treated as a special kind of package
 				relationships = OoxmlPackage.load(name="_rels", content=package_content)
 			else:
 				_content[package_name] = OoxmlPackage.load(name=package_name, content=package_content)
@@ -175,15 +175,13 @@ class OoxmlPackage(ArbitraryBaseModel):
 
 	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
 		"""
-		Computes string representation of a package.
+		Computes tree string representation of a package.
 		:param depth: Indentation depth integer, defaults to 0.
 		:param last: Package is the last one from the parent packages list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:param line_state: List of bools indicating whether to include vertical connection for each previous indentation depth.
 		:return: Package string representation.
 		"""
-		if line_state is None:
-			line_state = []
+		line_state = line_state if line_state is not None else []
 		
 		# Compute string representation of package header
 		prefix = " " if depth > 0 else ""
@@ -211,10 +209,12 @@ class OoxmlPackage(ArbitraryBaseModel):
 				packages[k] = v
 
 		# Sort parts names alphanumerically
-		sorted_parts = sorted(parts.keys(), key=lambda x: (
-				re.sub(r'[^a-zA-Z]+', '', x),
-				int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
-		))
+		sorted_parts = sorted(
+			parts.keys(),
+			key=lambda x: (
+				re.sub(r'[^a-zA-Z]+', '', x), int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
+			)
+		)
 
 		# Compute string representation of child parts
 		prefix = " "
@@ -223,8 +223,7 @@ class OoxmlPackage(ArbitraryBaseModel):
 		for i, part in enumerate(sorted_parts):
 			arrow = prefix + (
 				"\u2514\u2500\u2500\u25BA" if (
-					i == len(sorted_parts)-1 
-					and len(packages) == 0 and self.relationships is None
+					i == len(sorted_parts)-1 and len(packages) == 0 and self.relationships is None
 				)
 				else "\u251c\u2500\u2500\u25BA"
 			)

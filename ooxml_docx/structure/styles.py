@@ -89,7 +89,6 @@ class Style(OoxmlElement):
 class DocDefaults(Style):
 	"""
 
-	:param Style: Inherits attributes from Style.
 	"""
 	default_paragraph_properties: Optional[ParagraphProperties] = None
 	default_run_properties: Optional[RunProperties] = None
@@ -108,8 +107,7 @@ class DocDefaults(Style):
 
 class RunStyle(Style):
 	"""
-	Represents a .docx run style.
-	:param Style: Inherits attributes from Style.
+	Represents an OOXML run style.
 	"""
 	properties: Optional[RunProperties] = None
 	
@@ -130,8 +128,7 @@ class RunStyle(Style):
 
 class ParagraphStyle(Style):
 	"""
-	Represents a .docx paragraph style. Which can contain both paragraph and run properties.
-	:param Style: Inherits attributes from Style.
+	Represents an OOXML paragraph style. Which can contain both paragraph and run properties.
 	"""
 	properties: Optional[ParagraphProperties] = None
 	run_properties: Optional[RunProperties] = None
@@ -155,9 +152,8 @@ class ParagraphStyle(Style):
 
 class TableStyle(Style):
 	"""
-	Represents a .docx table style.
+	Represents an OOXML table style.
 	Which can contain general and conditional table properties, as well as row and cell properties.
-	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[TableProperties] = None
 	conditional_properties: Optional[TableConditionalProperties] = None
@@ -189,12 +185,10 @@ class TableStyle(Style):
 
 class _NumberingStyle(Style):
 	"""
-	Represents a .docx numbering style.
+	Represents an OOXML numbering style.
 	Which can contain numbering properties, and be inherited by or inherit abstract numbering definitions properties
 	
 	Important: Import NumberingStyle from ooxml_docx.numbering as this definition is incomplete!
-
-	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[NumberingProperties] = None
 
