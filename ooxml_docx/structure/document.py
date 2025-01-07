@@ -1,7 +1,10 @@
 from __future__ import annotations
 from typing import Optional
+from enum import Enum
+from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
+from ooxml_docx.relationships import OoxmlRelationships
 from ooxml_docx.structure.properties import (
 	RunProperties, ParagraphProperties, 
 	TableProperties, TableRowProperties, TableCellProperties,
@@ -76,7 +79,7 @@ class RunText(RunContent):
 
 
 class Run(OoxmlElement):
-	content: list[RunContent]
+	content: list[RunContent] = []
 	
 	properties: Optional[RunProperties] = None
 	style: Optional[RunStyle] = None
@@ -166,10 +169,7 @@ class Run(OoxmlElement):
 			if depth > 0 else ""
 		)
 		
-		s = f"{arrow} "
-		if self.style is not None:
-			s += f" [\033[1m{self.style.id}\033[0m]"
-		s += f" {''.join([repr(element.__str__()) for element in self.content])}\n"
+		s = f"{arrow} \033[1mRUN\033[0m\n"
 
 		# Update the line state for the current depth
 		if depth > 0:
@@ -178,20 +178,203 @@ class Run(OoxmlElement):
 			else:
 				line_state[depth] = not last
 		
-		if len(self.content) > 1:
-			# Compute string representation of content
-			prefix = " "
-			for level_state in line_state:
-				prefix += "\u2502    " if level_state else "     "
-			for i, element in enumerate(self.content):
-				arrow = prefix + "\u2514\u2500\u2500\u25BA" if i == len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
-				s += f"{arrow} {repr(element.__str__())}\n"
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + "\u251c\u2500\u2500\u25BA"
+		
+		if self.style is not None:
+			s += f"{arrow} \033[1mstyle\033[0m: {self.style.id}\n"
+		
+		arrow = prefix + "\u2514\u2500\u2500\u25BA"
+		s += f"{arrow} \033[1mcontent\033[0m:\n"
+		
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+
+		# Compute string representation of content
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		for i, element in enumerate(self.content):
+			arrow = prefix + "\u2514\u2500\u2500\u25BA" if i==len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
+			s += f"{arrow} {repr(element.__str__())}\n"
 
 		return s
 
-class Hyperlink(OoxmlElement):
-	miau: str
 
+class OoxmlHyperlinkType(Enum):
+	internal = "INTERNAL"
+	external = "EXTERNAL"
+
+
+class BookmarkDelimiter(ArbitraryBaseModel):
+	parent: Optional[OoxmlElement] = None
+	previous: Optional[OoxmlElement] = None
+
+
+class Bookmark(OoxmlElement):
+	id: int  # Id is just used to relate <w:bookmarkStart> and <w:bookmarkEnd> elements
+	name: str  # Actual id used to reference the bookmark, contained in <w:bookmarkStart>
+	
+	start_delimiter: Optional[BookmarkDelimiter] = None
+	# Empty while the <w:bookmarkEnd> element has not been found yet, should not remain empty after the document is parsed
+	end_delimiter: Optional[BookmarkDelimiter] = None
+
+	@classmethod
+	def start(cls, ooxml_bookmark_start: OoxmlElement) -> Bookmark:
+		"""_summary_
+
+		:param ooxml_bookmark_start: _description_
+		:return: _description_
+		"""
+		return cls(
+			element=ooxml_bookmark_start.element,
+			id=int(ooxml_bookmark_start.xpath_query(query="./@w:id", nullable=False, singleton=True)),
+			name=str(ooxml_bookmark_start.xpath_query(query="./@w:name", nullable=False, singleton=True))
+		)
+	
+	@classmethod
+	def end(cls, ooxml_bookmark_end: OoxmlElement) -> int:
+		"""_summary_
+
+		:param ooxml_bookmark_end: _description_
+		:return: _description_
+		"""
+		return int(ooxml_bookmark_end.xpath_query(query="./@w:id", nullable=False, singleton=True))
+
+
+class Hyperlink(OoxmlElement):
+	content: list[Run] = []
+	type: OoxmlHyperlinkType
+
+	#  
+	target: Optional[str | Bookmark] = None
+
+	@classmethod
+	def parse(cls, ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Hyperlink:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:return: _description_
+		"""
+		target_type: OoxmlHyperlinkType = cls._parse_type(ooxml_hyperlink=ooxml_hyperlink)
+
+		return cls(
+			element=ooxml_hyperlink.element,
+			content=cls._parse_content(ooxml_hyperlink=ooxml_hyperlink, styles=styles),
+			type=target_type,
+			target=cls._parse_target(ooxml_hyperlink=ooxml_hyperlink, type=target_type, relationships=relationships)
+		)
+	
+	@staticmethod
+	def _parse_content(ooxml_hyperlink: OoxmlElement, styles: OoxmlStyles) -> list[Run]:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		ooxml_runs: Optional[list[OoxmlElement]] = ooxml_hyperlink.xpath_query(query="./w:r")
+		if ooxml_runs is None:
+			return []
+		
+		content: list[Run] = []
+		for ooxml_run in ooxml_runs:
+			content.append(Run.parse(ooxml_run=ooxml_run, styles=styles))
+		
+		return content
+
+	@staticmethod
+	def _parse_type(ooxml_hyperlink: OoxmlElement) -> OoxmlHyperlinkType:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		relationship_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@r:id", singleton=True)
+		if relationship_id is not None:
+			return OoxmlHyperlinkType.external
+		
+		anchor_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@w:anchor", singleton=True)
+		if anchor_id is not None:
+			return OoxmlHyperlinkType.internal
+
+		raise ValueError("Undefined hyperlink type, cannot find target id reference")
+
+	@staticmethod
+	def _parse_target(
+		ooxml_hyperlink: OoxmlElement, type: OoxmlHyperlinkType, relationships: OoxmlRelationships
+	) -> Optional[str | Bookmark]:
+		"""_summary_
+
+		:param ooxml_hyperlink: _description_
+		:return: _description_
+		"""
+		if type == OoxmlHyperlinkType.external:
+			print(relationships.content)
+			relationship_id: str = str(ooxml_hyperlink.xpath_query(query="./@r:id", nullable=False, singleton=True))
+			return relationships.content[relationship_id].target
+		elif type == OoxmlHyperlinkType.internal:
+			return None
+
+	def __str__(self) -> str:
+		return self._tree_str_()
+	
+	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
+		"""
+		Computes string representation of a paragraph.
+
+		:param depth: Indentation depth integer, defaults to 0.
+		:param last: Paragraph is the last one from the parent element list, defaults to False.
+		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
+		 defaults to None to avoid mutable list initialization unexpected behavior.
+		:return: Package string representation.
+		"""
+		if line_state is None:
+			line_state = []
+		
+		# Compute string representation of package header
+		prefix = " " if depth > 0 else ""
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + (
+			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
+			if depth > 0 else ""
+		)
+		
+		s = f"{arrow} \033[1mHYPERLINK\033[0m\n"
+
+		# Update the line state for the current depth
+		if depth > 0:
+			if depth >= len(line_state):
+				line_state.append(not last)
+			else:
+				line_state[depth] = not last
+		
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		arrow = prefix + "\u251c\u2500\u2500\u25BA"
+		
+		s += f"{arrow} \033[1mtype\033[0m: {self.type.value}\n"
+		s += f"{arrow} \033[1mtarget\033[0m: {self.target}\n"
+
+		# Compute string representation of content
+		prefix = " "
+		for level_state in line_state:
+			prefix += "\u2502    " if level_state else "     "
+		for i, element in enumerate(self.content):
+			s += element._tree_str_(
+				depth=depth+2, last=i==len(self.content)-1, line_state=line_state[:]  # Pass-by-value
+			)
+
+		return s
 
 class Paragraph(OoxmlElement):
 	content: list[Run | Hyperlink] = []
@@ -201,7 +384,7 @@ class Paragraph(OoxmlElement):
 	numbering: Optional[Numbering] = None
 
 	@classmethod
-	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> Paragraph:
+	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Paragraph:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
@@ -211,20 +394,22 @@ class Paragraph(OoxmlElement):
 
 		return cls(
 			element=ooxml_paragraph.element,
-			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles),
+			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles, relationships=relationships),
 			properties=ParagraphProperties(ooxml=properties) if properties is not None else None,
 			style=cls._parse_style(ooxml_paragraph=ooxml_paragraph, styles=styles)
 		)
 
 	@staticmethod
-	def _parse_content(ooxml_paragraph: OoxmlElement, styles: OoxmlStyles) -> list[Run | Hyperlink]:
+	def _parse_content(
+		ooxml_paragraph: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships
+	) -> list[Run | Hyperlink]:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./w:r | ./w:hyperlink")
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./*[not(self::w:pPr or self::w:bookmarkStart or self::w:bookmarkEnd)]")
 		if ooxml_content is None:
 			return []
 		
@@ -234,9 +419,12 @@ class Paragraph(OoxmlElement):
 				case "r":
 					element: Run = Run.parse(ooxml_run=ooxml_element, styles=styles)
 				case "hyperlink":
-					continue
+					element: Hyperlink = Hyperlink.parse(
+						ooxml_hyperlink=ooxml_element, styles=styles, relationships=relationships
+					)
 				case _:
-					raise ValueError("")  # TODO
+					continue
+					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
 			content.append(element)
 		
 		return content
@@ -559,20 +747,20 @@ class OoxmlDocument(OoxmlElement):
 	body: list[Paragraph | Table] = []
 
 	@classmethod
-	def build(cls, ooxml_document_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlDocument:
+	def build(cls, ooxml_document_part: OoxmlPart, styles: OoxmlStyles, relationships: OoxmlRelationships) -> OoxmlDocument:
 		"""_summary_
 
 		:param ooxml_document_part: _description_
 		:return: _description_
 		"""
-		
+
 		return cls(
 			element=ooxml_document_part.ooxml.element,
-			body=cls._parse_body(ooxml_document_part=ooxml_document_part, styles=styles)
+			body=cls._parse_body(ooxml_document_part=ooxml_document_part, styles=styles, relationships=relationships)
 		)
 	
 	@staticmethod
-	def _parse_body(ooxml_document_part: OoxmlPart, styles: OoxmlStyles) -> list[Paragraph | Table]:
+	def _parse_body(ooxml_document_part: OoxmlPart, styles: OoxmlStyles, relationships: OoxmlRelationships) -> list[Paragraph | Table]:
 		"""_summary_
 
 		:param ooxml_document_part: _description_
@@ -582,22 +770,24 @@ class OoxmlDocument(OoxmlElement):
 		if ooxml_body is None:
 			return []
 
-		ooxml_content: Optional[list[OoxmlElement]] = ooxml_body.xpath_query(query="./w:p | ./w:tbl")
-		
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_body.xpath_query(query="./*[not(self::w:bookmarkStart or self::w:bookmarkEnd)]")
+		if ooxml_content is None:
+			return []
+
 		content: list[Paragraph | Table] = []
-		if ooxml_content is not None:
-			for ooxml_element in ooxml_content:
-				match ooxml_element.local_name:
-					case "p":
-						element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles)
-					case "tbl":
-						element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles)
-					case _:
-						raise ValueError("")  # TODO
-				content.append(element)
-				
+		for ooxml_element in ooxml_content:
+			match ooxml_element.local_name:
+				case "p":
+					element: Paragraph = Paragraph.parse(ooxml_paragraph=ooxml_element, styles=styles, relationships=relationships)
+				case "tbl":
+					element: Table = Table.parse(ooxml_table=ooxml_element)
+				case _:
+					continue
+					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
+			content.append(element)
+			
 		return content
-		
+
 	def __str__(self) -> str:
 		s = "\033[36m\033[1mBody\033[0m\n"
 		for i, element in enumerate(self.body):

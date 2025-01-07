@@ -35,7 +35,7 @@ class OoxmlElement(ArbitraryBaseModel):
 		:return: Xpath query results, None when the result is empty.
 		:raises ValueError: Raises error if nullable or single constraints are failed.
 		"""
-		query_result: list[etreeElement] = self.element.xpath(query, namespaces=self.element.nsmap)
+		query_result: list[etreeElement] = self.element.xpath(query, namespaces=self._prepare_namespaces())
 		
 		if len(query_result) == 0:
 			if not nullable:
@@ -51,6 +51,32 @@ class OoxmlElement(ArbitraryBaseModel):
 			self._cast_xpath_query_result(query_result_element=query_result_element) for query_result_element in query_result
 		]
 	
+	def _prepare_namespaces(self) -> dict[str, str]:
+		"""
+		When a namespace is detected without a defined prefix (detected by None being the nsmap key)
+		 assign an appropriate prefix to that namespace.
+		Even though it won't be used for the actual query, it is just to avoid empty lxml namespace prefix error.
+		Use '*[local-name()='x'] to actually search for the desired elements with the empty namespace prefix
+
+		It is assumed that there can only be a maximum of 1 namespace with an empty prefix,
+		 because if that is not the key it would actually violate namespace prefix uniqueness of the underlying XML.		
+		Decided to go with 'ens' (empty namespace) prefix as a general and neutral option for empty namespace prefix.
+
+		:returns:
+		:raises KeyError: If 'ens' is already being used as a prefix for another namespace.
+		"""
+		if None in self.element.nsmap.keys():
+			if "ens" not in self.element.nsmap.keys():
+				namespaces = self.element.nsmap.copy()  # Use a copy of the nsmap because lxml nsmap is immutable
+				namespaces["ens"] = namespaces.pop(None)
+				return namespaces
+			else:
+				raise KeyError(
+					"Empty namespace prefix could not be assigned generic 'ens' prefix because it is already in use"
+				)
+		
+		return self.element.nsmap
+
 	# TODO: maybe to not have to do this weird casting thing for attributes create wrapper function to access attributes
 	def _cast_xpath_query_result(self, query_result_element: Any) -> XpathQueryResult:
 		"""
