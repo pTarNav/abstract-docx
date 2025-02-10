@@ -3,8 +3,8 @@ from ooxml_docx.ooxml import OoxmlElement
 
 class OoxmlProperties(OoxmlElement):
 	"""
-	Represents an OOXML (Office Open XML) properties element.
-	Where despite a general OOXML properties element not existing in the OOXML standard,
+	Representation of an OOXML properties element.
+	Where, despite a general OOXML properties element not existing in the OOXML standard,
 	 it is helpful to have a general class that will enforce tag validation.
 	
 	Instead of needing to specify the fields for each type of properties element, store as the whole OOXML element.

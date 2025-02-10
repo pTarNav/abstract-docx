@@ -8,8 +8,8 @@ class Relationship(OoxmlElement):
 	"""
 	Represents an OOXML relationship.
 	Which indicates the relationship between an OOXML element of an OOXML part, with either:
-	 - Another OOXML of a different OOXML part (in the same OOXML package), called internal relationship.
-	 - An external resource, called external relationship.
+		- Another OOXML of a different OOXML part (in the same OOXML package), called internal relationship.
+		- An external resource, called external relationship.
 	"""
 	id: str
 	# Note that an enumeration is not used just in case there exists a type not contemplated used in some obscure .docx version

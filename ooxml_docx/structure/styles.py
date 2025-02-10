@@ -2,10 +2,10 @@ from __future__ import annotations
 from typing import Optional, Any
 from enum import Enum
 from pydantic import model_validator
-from utils.pydantic import ArbitraryBaseModel
 
 import re
 
+from utils.pydantic import ArbitraryBaseModel
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import (
 	RunProperties, ParagraphProperties, 
@@ -16,7 +16,10 @@ from ooxml_docx.structure.properties import (
 
 class Style(OoxmlElement):
 	"""
-
+	Representation of an OOXML style element.
+	An OOXML style is a named collection of content specific OOXML properties.
+	Styles have a hierarchical structure, where one can construct a style (child) from another style (parent),
+	 inheriting all the OOXML properties of the parent style.
 	"""
 	id: str
 	name: Optional[str] = None
@@ -25,10 +28,10 @@ class Style(OoxmlElement):
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> Style:
-		"""_summary_
-
-		:param ooxml_style: _description_
-		:return: _description_
+		"""
+		Reads the contents of an OOXML style element.
+		:param ooxml_style: Raw OOXML style element.
+		:return: Parsed style representation.
 		"""
 		name: Optional[str] = ooxml_style.xpath_query(query="./w:name/@w:val", singleton=True)
 
@@ -47,12 +50,10 @@ class Style(OoxmlElement):
 
 		:param depth: Indentation depth integer, defaults to 0.
 		:param last: Package is the last one from the parent packages list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-			defaults to None to avoid mutable list initialization unexpected behavior.
-		:return: Package string representation.
+		:param line_state: List of bools indicating whether to include vertical connection for each previous indentation depth.
+		:return: Style string representation.
 		"""
-		if line_state is None:
-			line_state = []
+		line_state = line_state if line_state is not None else []
 		
 		# Compute string representation of package header
 		prefix = " " if depth > 0 else ""
@@ -73,10 +74,12 @@ class Style(OoxmlElement):
 
 		if self.children is not None:
 			# Sort children names alphanumerically
-			sorted_children = sorted(self.children, key=lambda x: (
+			sorted_children = sorted(
+				self.children, key=lambda x: (
 					re.sub(r'[^a-zA-Z]+', '', x.name),
 					int(re.search(r'(\d+)', x.name).group(1)) if re.search(r'(\d+)', x.name) else 0
-			))
+				)
+			)
 
 			for i, style in enumerate(sorted_children):
 				s += style._tree_str_(
@@ -128,7 +131,8 @@ class RunStyle(Style):
 
 class ParagraphStyle(Style):
 	"""
-	Represents an OOXML paragraph style. Which can contain both paragraph and run properties.
+	Represents an OOXML paragraph style.
+	Which can contain both paragraph and run properties.
 	"""
 	properties: Optional[ParagraphProperties] = None
 	run_properties: Optional[RunProperties] = None
@@ -215,6 +219,7 @@ class OoxmlStyleTypes(Enum):
 	NUMBERING = "numbering"
 
 
+# Map to obtain the respective style class based on the enumeration
 OOXML_STYLE_TYPES_CLASSES: dict[OoxmlStyleTypes, type[Style]] = {
 	OoxmlStyleTypes.RUN: RunStyle,
 	OoxmlStyleTypes.PARAGRAPH: ParagraphStyle,
@@ -369,15 +374,16 @@ class OoxmlStyles(ArbitraryBaseModel):
 		)
 	
 	def find(self, id: str, type: Optional[OoxmlStyleTypes] = None) -> Optional[Style]:
-		"""_summary_
+		"""
+		Helper function for searching a style based on its id and type inside the styles tree roots.
 
 		Because ids are assumed to be unique, this function will return the first match,
 		 where in the case where no style type is specified it will search in the following order:
 			run > paragraph > table > numbering
 
-		:param id: _description_
-		:param type: _description_
-		:return: _description_
+		:param id: Id of the style being searched.
+		:param type: Style type of the style being searched.
+		:return: Result of the search, a single style object or None when no match is found.
 		"""
 		
 		search_space: list[Style] = []
@@ -397,7 +403,7 @@ class OoxmlStyles(ArbitraryBaseModel):
 		for root in search_space:
 			search_result: Optional[Style] = self._find(id=id, root=root)
 			if search_result is not None:
-				return search_result
+				return search_result  # Return the first match
 		
 		# No match found
 		return None
@@ -407,9 +413,9 @@ class OoxmlStyles(ArbitraryBaseModel):
 		Searches the given id inside the given tree and returns the matching style found.
 		If no matches where found, returns None.
 
-		:param id: _description_
-		:param root: _description_
-		:return: _description_
+		:param id: Id of the style being searched.
+		:param root: Style specific tree root being search on.
+		:return: Result of the search, a single style object or None when no match is found.
 		"""
 		if root.id == id:
 			return root

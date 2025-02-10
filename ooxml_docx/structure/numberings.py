@@ -12,7 +12,7 @@ class NumberingStyle(_NumberingStyle):
 
 	Important: This is the complete version and the one that should be used for imports.
 	
-	:param NumberingStyle: _description_
+	:param _NumberingStyle: Incomplete class of NumberingStyle defined in 'styles.py'.
 	"""
 	abstract_numbering_parent: Optional[AbstractNumbering] = None
 	abstract_numbering_children: Optional[list[AbstractNumbering]] = None
@@ -374,13 +374,11 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		ooxml_abstract_numberings: Optional[list[OoxmlElement]] = ooxml_numbering_part.ooxml.xpath_query(
 			query="./w:abstractNum"
 		)
-		if ooxml_abstract_numberings is None:
-			return []
-		
+
 		return [
 			AbstractNumbering.parse(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles)
 			for ooxml_abstract_numbering in ooxml_abstract_numberings
-		]
+		] if ooxml_abstract_numberings is not None else []
 
 		
 	@staticmethod
