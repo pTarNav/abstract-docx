@@ -7,6 +7,9 @@ import re
 
 from utils.pydantic import ArbitraryBaseModel
 
+from rich.tree import Tree
+from utils.rich_tree import rich_tree_to_str
+
 
 class OoxmlElement(ArbitraryBaseModel):
 	"""
@@ -171,81 +174,33 @@ class OoxmlPackage(ArbitraryBaseModel):
 		return cls(name=name, content=_content, relationships=relationships)
 
 	def __str__(self) -> str:
-		return self._tree_str_()
+		return rich_tree_to_str(self._tree_str_())
 
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes tree string representation of a package.
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Package is the last one from the parent packages list, defaults to False.
-		:param line_state: List of bools indicating whether to include vertical connection for each previous indentation depth.
-		:return: Package string representation.
-		"""
-		line_state = line_state if line_state is not None else []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow}\U0001F4C1 '{self.name}'\n"
+	def _tree_str_(self) -> Tree:
+		tree = Tree(f":file_folder: '{self.name}'")
 
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
+		parts = {k: v for k, v in self.content.items() if isinstance(v, OoxmlPart)}
+		packages = {k: v for k, v in self.content.items() if isinstance(v, OoxmlPackage)}
 
-		parts: dict[str, OoxmlPart] = {}
-		packages: dict[str, OoxmlPackage] = {}
-		for k, v in self.content.items():
-			if isinstance(v, OoxmlPart):
-				parts[k] = v
-			elif isinstance(v, OoxmlPackage):
-				packages[k] = v
-
-		# Sort parts names alphanumerically
+		# Sort part names alphanumerically and add them as child nodes
 		sorted_parts = sorted(
 			parts.keys(),
 			key=lambda x: (
-				re.sub(r'[^a-zA-Z]+', '', x), int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
+				re.sub(r'[^a-zA-Z]+', '', x),
+				int(re.search(r'(\d+)', x).group(1)) if re.search(r'(\d+)', x) else 0
 			)
 		)
+		for part in sorted_parts:
+			icon = ":page_facing_up:" if not part.endswith(".rels") else ":chains:"
+			tree.add(f"{icon} '{part}'")
 
-		# Compute string representation of child parts
-		prefix = " "
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		for i, part in enumerate(sorted_parts):
-			arrow = prefix + (
-				"\u2514\u2500\u2500\u25BA" if (
-					i == len(sorted_parts)-1 and len(packages) == 0 and self.relationships is None
-				)
-				else "\u251c\u2500\u2500\u25BA"
-			)
-			if not part.endswith(".rels"):
-				s += f"{arrow}\U0001F4C4 '{part}'\n"
-			else:
-				s += f"{arrow}\u26D3 '{part}'\n"
-		
-		# Sort packages names
+		# Sort packages by name and add them recursively
 		sorted_packages = sorted(packages.values(), key=lambda x: x.name)
-
-		# Compute string representation of child packages
-		for i, package in enumerate(sorted_packages):
-			s += package._tree_str_(
-				depth=depth+1, last=(i==len(sorted_packages)-1 and self.relationships is None),
-				line_state=line_state[:]  # Pass-by-value
-			)
+		for package in sorted_packages:
+			tree.add(package._tree_str_())
 		
-		# Compute string representation of relationships (_rels)
+		# If there are relationships, add them as end child node
 		if self.relationships is not None:
-			s += self.relationships._tree_str_(
-				depth=depth+1, last=True, line_state=line_state[:]  # Pass-by-value
-			)
-
-		return s
+			tree.add(self.relationships._tree_str_())
+		
+		return tree
