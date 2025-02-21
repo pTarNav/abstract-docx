@@ -6,6 +6,10 @@ from pydantic import model_validator
 import re
 
 from utils.pydantic import ArbitraryBaseModel
+
+from rich.tree import Tree
+from utils.rich_tree import rich_tree_to_str
+
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import (
 	RunProperties, ParagraphProperties, 
@@ -42,35 +46,11 @@ class Style(OoxmlElement):
 		)
 	
 	def __str__(self) -> str:
-		return self._tree_str_()
+		return rich_tree_to_str(self._tree_str_())
 	
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes string representation of a style.
 
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Package is the last one from the parent packages list, defaults to False.
-		:param line_state: List of bools indicating whether to include vertical connection for each previous indentation depth.
-		:return: Style string representation.
-		"""
-		line_state = line_state if line_state is not None else []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow} \033[1m{self.id}\033[0m: '{self.name if self.name is not None else ''}'\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
+	def _tree_str_(self) -> Tree:
+		tree = Tree(f"[bold]{self.id}[/bold]: '{self.name if self.name is not None else ''}'")
 
 		if self.children is not None:
 			# Sort children names alphanumerically
@@ -80,13 +60,10 @@ class Style(OoxmlElement):
 					int(re.search(r'(\d+)', x.name).group(1)) if re.search(r'(\d+)', x.name) else 0
 				)
 			)
+			for children in sorted_children:
+				tree.add(children._tree_str_())
 
-			for i, style in enumerate(sorted_children):
-				s += style._tree_str_(
-					depth=depth+1, last=i==len(self.children)-1, line_state=line_state[:]  # Pass-by-value
-				)
-		
-		return s
+		return tree
 
 
 class DocDefaults(Style):
@@ -301,19 +278,28 @@ class OoxmlStylesRoots(ArbitraryBaseModel):
 		return roots
 
 	def __str__(self) -> str:
-		s = "\033[36m\033[1mRun styles\033[0m\n"
+		return rich_tree_to_str(self._tree_str_())
+
+	def _tree_str_(self) -> Tree:
+		tree = Tree(":artist_palette: [bold cyan]Styles[/bold cyan]")
+		
+		run_styles_tree = tree.add("[bold cyan]Run styles[/bold cyan]")
 		for i, style in enumerate(self.run):
-			s += style._tree_str_(depth=1, last=i==len(self.run)-1)
-		s += "\033[36m\033[1mParagraph styles\033[0m\n"
+			run_styles_tree.add(style._tree_str_())
+
+		paragraph_styles_tree = tree.add("[bold cyan]Paragraph styles[/bold cyan]")
 		for i, style in enumerate(self.paragraph):
-			s += style._tree_str_(depth=1, last=i==len(self.paragraph)-1)
-		s += "\033[36m\033[1mTable styles\033[0m\n"
+			paragraph_styles_tree.add(style._tree_str_())
+
+		table_styles_tree = tree.add("[bold cyan]Table styles[/bold cyan]")
 		for i, style in enumerate(self.table):
-			s += style._tree_str_(depth=1, last=i==len(self.table)-1)
-		s += "\033[36m\033[1mNumbering styles\033[0m\n"
+			table_styles_tree.add(style._tree_str_())
+
+		numbering_styles_tree = tree.add("[bold cyan]Numbering styles[/bold cyan]")
 		for i, style in enumerate(self.numbering):
-			s += style._tree_str_(depth=1, last=i==len(self.numbering)-1)
-		return s
+			numbering_styles_tree.add(style._tree_str_())
+
+		return tree
 
 
 class OoxmlStyles(ArbitraryBaseModel):

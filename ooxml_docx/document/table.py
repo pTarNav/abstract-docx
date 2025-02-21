@@ -5,7 +5,7 @@ from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.relationships import OoxmlRelationships
 from ooxml_docx.structure.properties import TableProperties, TableRowProperties, TableCellProperties
 from ooxml_docx.structure.styles import TableStyle, OoxmlStyles, OoxmlStyleTypes
-from ooxml_docx.structure.document.paragraph import Paragraph
+from ooxml_docx.document.paragraph import Paragraph
 
 
 class TableCell(OoxmlElement):

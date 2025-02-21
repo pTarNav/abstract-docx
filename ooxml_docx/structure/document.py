@@ -4,8 +4,8 @@ from typing import Optional
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.relationships import OoxmlRelationships
 from ooxml_docx.structure.styles import OoxmlStyles
-from ooxml_docx.structure.document.paragraph import Paragraph
-from ooxml_docx.structure.document.table import Table
+from ooxml_docx.document.paragraph import Paragraph
+from ooxml_docx.document.table import Table
 
 
 class OoxmlDocument(OoxmlElement):
@@ -54,6 +54,7 @@ class OoxmlDocument(OoxmlElement):
 				case "tbl":
 					element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles, relationships=relationships)
 				case _:
+					# ! TODO: remove continue
 					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
 			content.append(element)
@@ -61,9 +62,5 @@ class OoxmlDocument(OoxmlElement):
 		return content
 
 	def __str__(self) -> str:
-		s = "\033[36m\033[1mBody\033[0m\n"
-		for i, element in enumerate(self.body):
-			s += element._tree_str_(depth=1, last=i==len(self.body)-1)
-		
-		return s
+		raise NotImplementedError("")
 

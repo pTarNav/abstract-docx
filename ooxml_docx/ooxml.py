@@ -124,7 +124,9 @@ class OoxmlPart(ArbitraryBaseModel):
 		return cls(name=name, ooxml=OoxmlElement(element=etree.fromstring(content)))
 
 	def __str__(self) -> str:
-		return f"\U0001F4C4 '{self.name}'"
+		s = f"\U0001F4C4 \033[36m\033[1m'{self.name}'\033[0m\n"
+		s += f"{self.ooxml}"
+		return s
 
 
 class OoxmlPackage(ArbitraryBaseModel):
