@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
+from rich.tree import Tree
+from utils.rich_tree import rich_tree_to_str
+
 from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.structure.properties import RunProperties
 from ooxml_docx.structure.styles import RunStyle, OoxmlStyles, OoxmlStyleTypes
@@ -10,7 +13,7 @@ class RunContent(OoxmlElement):
 	text: str
 
 	def __str__(self) -> str:
-		return self.text
+		return repr(self.text)
 
 
 RUN_SPECIAL_TEXT_TAGS: list[str] = ["br", "cr", "sym", "tab", "noBreakHyphen", "softHyphen"]
@@ -137,63 +140,17 @@ class Run(OoxmlElement):
 		raise ValueError("")  # TODO
 	
 	def __str__(self) -> str:
-		return self._tree_str_()
+		return rich_tree_to_str(self._tree_str_())
 	
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes string representation of a paragraph.
+	def _tree_str_(self) -> Tree:
+		tree = Tree("[bold]Run[/bold]")
 
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Paragraph is the last one from the parent element list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-		 defaults to None to avoid mutable list initialization unexpected behavior.
-		:return: Package string representation.
-		"""
-		if line_state is None:
-			line_state = []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		
-		s = f"{arrow} \033[1mRUN\033[0m\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
-		
-		prefix = " "
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + "\u251c\u2500\u2500\u25BA"
-		
 		if self.style is not None:
-			s += f"{arrow} \033[1mstyle\033[0m: {self.style.id}\n"
-		
-		arrow = prefix + "\u2514\u2500\u2500\u25BA"
-		s += f"{arrow} \033[1mcontent\033[0m:\n"
-		
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
+			tree.add(f"[bold]Style[/bold cyan]: '{self.style.id}'")
 
-		# Compute string representation of content
-		prefix = " "
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		for i, element in enumerate(self.content):
-			arrow = prefix + "\u2514\u2500\u2500\u25BA" if i==len(self.content)-1 else "\u251c\u2500\u2500\u25BA"
-			s += f"{arrow} {repr(element.__str__())}\n"
+		if len(self.content) != 0:
+			content_tree = tree.add("[bold cyan]Content[/bold cyan]")
+			for i, content in enumerate(self.content):
+				content_tree.add(content.__str__())
 
-		return s
+		return tree

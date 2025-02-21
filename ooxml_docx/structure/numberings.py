@@ -432,6 +432,30 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			for ooxml_numbering in ooxml_numberings
 		]
 	
+	def find(self, id: int) -> Optional[Numbering]:
+		"""
+		Helper function for searching a numbering based on its id inside the numbering tree.
+
+		Only numberings are of interest because any other outside ooxml element will always reference a numbering,
+		 not an abstract numbering. 
+		(With the only exception being the inheritance system between styles and abstract numberings properties)
+
+		Because ids are assumed to be unique, this function will return the first match.
+
+		:param id: Id of the numbering being searched.
+		:return: Result of the search, a single Numbering object or None when no match is found.
+		"""
+		for numbering in self.numberings:
+			if numbering.id == id:
+				return numbering
+		
+		# No match found
+		return None
+	
+	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
+		
+		raise ValueError("") # TODO
+
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
 	

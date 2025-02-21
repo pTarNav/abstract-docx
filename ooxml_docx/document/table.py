@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 
+from rich.tree import Tree
+from utils.rich_tree import rich_tree_to_str
+
 from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.relationships import OoxmlRelationships
 from ooxml_docx.structure.properties import TableProperties, TableRowProperties, TableCellProperties
@@ -53,6 +56,7 @@ class TableCell(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			match ooxml_element.local_name:
 				case "p":
+					continue
 					element: Paragraph = Paragraph.parse(
 						ooxml_paragraph=ooxml_element, styles=styles, relationships=relationships
 					)
@@ -67,33 +71,12 @@ class TableCell(OoxmlElement):
 		return content
 
 	def __str__(self) -> str:
-		return ""
+		return rich_tree_to_str(self._tree_str_())
 
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		line_state = line_state if line_state is not None else []
-		
-		# Compute string representation of cell header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow} \033[1mCell\033[0m: {self.loc}\n"
+	def _tree_str_(self) -> Tree:
+		tree = Tree("table cell")
+		return tree
 
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
-
-		# Compute string representation of content
-		for i, element in enumerate(self.content):
-			s += element._tree_str_(depth=depth+1, last=i==len(self.content)-1, line_state=line_state[:])  # Pass-by-value
-
-		return s	
 
 class TableRow(OoxmlElement):
 	cells: list[TableCell] = []
@@ -139,34 +122,11 @@ class TableRow(OoxmlElement):
 		return cells
 
 	def __str__(self) -> str:
-		raise NotImplementedError("")
+		raise rich_tree_to_str(self._tree_str_())
 
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		line_state = line_state if line_state is not None else []
-		
-		# Compute string representation of row header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow} \033[1mRow\033[0m: {self.loc}\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
-
-		# Compute string representation of cells
-		for i, cell in enumerate(self.cells):
-			s += cell._tree_str_(depth=depth+1, last=i==len(self.cells)-1, line_state=line_state[:])  # Pass-by-value
-
-		return s
-
+	def _tree_str_(self) -> Tree:
+		tree = Tree("table row")
+		return tree
 
 class Table(OoxmlElement):
 	rows: list[TableRow] = []
@@ -231,34 +191,8 @@ class Table(OoxmlElement):
 		raise ValueError(f"Undefined style reference for style id: {style_id}")
 
 	def __str__(self) -> str:
-		return ""
+		return rich_tree_to_str(self._tree_str_())
 	
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		if line_state is None:
-			line_state = []
-		
-		# Compute string representation of table header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow} \033[1mTable\033[0m"
-		if self.caption is not None:
-			s += f" '{self.caption}'"
-		s += "\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
-
-		# Compute string representation of rows
-		for i, row in enumerate(self.rows):
-			s += row._tree_str_(depth=depth+1, last=i==len(self.rows)-1, line_state=line_state[:])  # Pass-by-value
-
-		return s
+	def _tree_str_(self) -> Tree:
+		tree = Tree("table")
+		return tree

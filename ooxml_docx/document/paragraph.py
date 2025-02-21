@@ -1,13 +1,17 @@
 from __future__ import annotations
 from typing import Optional
 from enum import Enum
+
 from utils.pydantic import ArbitraryBaseModel
+
+from rich.tree import Tree
+from utils.rich_tree import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.relationships import OoxmlRelationships
-from ooxml_docx.structure.properties import ParagraphProperties
+from ooxml_docx.structure.properties import ParagraphProperties, NumberingProperties
 from ooxml_docx.structure.styles import ParagraphStyle, OoxmlStyles, OoxmlStyleTypes
-from ooxml_docx.structure.numberings import NumberingStyle, Numbering
+from ooxml_docx.structure.numberings import NumberingStyle, Numbering, OoxmlNumberings
 from ooxml_docx.document.run import Run
 
 
@@ -128,79 +132,50 @@ class Hyperlink(OoxmlElement):
 			return None
 
 	def __str__(self) -> str:
-		return self._tree_str_()
+		return rich_tree_to_str(self._tree_str_())
 	
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes string representation of a paragraph.
+	def _tree_str_(self) -> Tree:
+		tree = Tree("hyperlink")
+		return tree
 
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Paragraph is the last one from the parent element list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-		 defaults to None to avoid mutable list initialization unexpected behavior.
-		:return: Package string representation.
-		"""
-		if line_state is None:
-			line_state = []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		
-		s = f"{arrow} \033[1mHYPERLINK\033[0m\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
-		
-		prefix = " "
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + "\u251c\u2500\u2500\u25BA"
-		
-		s += f"{arrow} \033[1mtype\033[0m: {self.type.value}\n"
-		s += f"{arrow} \033[1mtarget\033[0m: {self.target}\n"
-
-		# Compute string representation of content
-		prefix = " "
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		for i, element in enumerate(self.content):
-			s += element._tree_str_(
-				depth=depth+2, last=i==len(self.content)-1, line_state=line_state[:]  # Pass-by-value
-			)
-
-		return s
 
 class Paragraph(OoxmlElement):
 	content: list[Run | Hyperlink] = []
 	
 	properties: Optional[ParagraphProperties] = None
 	style: Optional[ParagraphStyle | NumberingStyle] = None
+	
 	numbering: Optional[Numbering] = None
+	indentation_level: Optional[int] = None
 
 	@classmethod
-	def parse(cls, ooxml_paragraph: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Paragraph:
+	def parse(
+			cls, 
+			ooxml_paragraph: OoxmlElement, 
+			styles: OoxmlStyles, 
+			numberings: OoxmlNumberings, 
+			relationships: OoxmlRelationships
+		) -> Paragraph:
 		"""_summary_
 
 		:param ooxml_paragraph: _description_
 		:return: _description_
 		"""
 		properties: Optional[OoxmlElement] = ooxml_paragraph.xpath_query(query="./w:pPr", singleton=True)
+		style: Optional[ParagraphStyle | NumberingStyle] = cls._parse_style(ooxml_paragraph=ooxml_paragraph, styles=styles)
+		numbering_parse_result: Optional[tuple[Numbering, int]] = cls._parse_numbering(
+			ooxml_paragraph=ooxml_paragraph,
+			numbering_style=style if isinstance(style, NumberingStyle) else None,  # Only numbering style is relevant
+			numberings=numberings
+		)
 
 		return cls(
 			element=ooxml_paragraph.element,
 			content=cls._parse_content(ooxml_paragraph=ooxml_paragraph, styles=styles, relationships=relationships),
 			properties=ParagraphProperties(ooxml=properties) if properties is not None else None,
-			style=cls._parse_style(ooxml_paragraph=ooxml_paragraph, styles=styles)
+			style=style,
+			numbering=numbering_parse_result[0] if numbering_parse_result is not None else None,
+			indentation_level=numbering_parse_result[1] if numbering_parse_result is not None else None
 		)
 
 	@staticmethod
@@ -213,7 +188,9 @@ class Paragraph(OoxmlElement):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(query="./*[not(self::w:pPr or self::w:bookmarkStart or self::w:bookmarkEnd)]")
+		ooxml_content: Optional[list[OoxmlElement]] = ooxml_paragraph.xpath_query(
+			query="./*[not(self::w:pPr or self::w:bookmarkStart or self::w:bookmarkEnd)]"
+		)
 		if ooxml_content is None:
 			return []
 		
@@ -257,51 +234,53 @@ class Paragraph(OoxmlElement):
 			return numbering_style_search_result
 
 		raise ValueError(f"Undefined style reference for style id: {style_id}")
-
-	def __str__(self) -> str:
-		return self._tree_str_()
-
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes string representation of a paragraph.
-
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Paragraph is the last one from the parent element list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-		 defaults to None to avoid mutable list initialization unexpected behavior.
-		:return: Package string representation.
-		"""
-		if line_state is None:
-			line_state = []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
+	
+	@staticmethod
+	def _parse_numbering(
+			ooxml_paragraph: OoxmlElement, numbering_style: Optional[NumberingStyle], numberings: OoxmlNumberings
+		) -> Optional[Numbering]:
+		ooxml_numbering: Optional[NumberingProperties] = ooxml_paragraph.xpath_query(
+			query="./w:pPr/w:numPr", singleton=True
 		)
 
-		s = f"{arrow}"
+		# Case: Direct numbering properties
+		# Direct formatting of numbering properties always overrides any numbering style
+		if ooxml_numbering is not None:
+			numbering_id: int = int(ooxml_numbering.xpath_query(
+				query="./w:numId/@w:val", nullable=False, singleton=True
+			))
+			indentation_level: int = int(ooxml_numbering.xpath_query(
+				query="./w:ilvl/@w:val", nullable=False, singleton=True
+			))
+			return numberings.find(id=numbering_id), indentation_level
+		
+		# Case: Numbering properties via numbering style
+		if numbering_style is not None:
+			numbering_id: int = int(numbering_style.xpath_query(
+				query="./w:numId/@w:val", nullable=False, singleton=True
+			))
+
+			return numberings.find(id=numbering_id), numberings.find_numbering_style_level(numbering_style=numbering_style)
+
+		return None
+
+	def __str__(self) -> str:
+		return rich_tree_to_str(self._tree_str_())
+
+	def _tree_str_(self) -> Tree:
+		tree = Tree("[bold]Paragraph[/bold]")
+
 		if self.style is not None:
-			s += f" [\033[1m{self.style.id}\033[0m]"
-		s += " '"
-		for element in self.content:
-			s += "".join([_element.__str__() for _element in element.content])
-		s += "'\n"
+			tree.add(f"[bold]Style[/bold]: '{self.style.id}'")
+		
+		if self.numbering is not None:
+			tree.add(f"[bold]Numbering[/bold]: '{self.numbering.id}'")
+		if self.indentation_level is not None:
+			tree.add(f"[bold]Indentation level[/bold]: '{self.indentation_level}'")
 
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
+		if len(self.content) != 0:
+			content_tree = tree.add("[bold cyan]Content[/bold cyan]")
+			for i, content in enumerate(self.content):
+				content_tree.add(content._tree_str_())
 
-		# Compute string representation of content
-		for i, element in enumerate(self.content):
-			s += element._tree_str_(
-				depth=depth+1, last=i==len(self.content)-1, line_state=line_state[:]  # Pass-by-value
-			)
-
-		return s
+		return tree
