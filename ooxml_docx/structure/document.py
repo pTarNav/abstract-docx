@@ -60,8 +60,8 @@ class OoxmlDocument(OoxmlElement):
 			# From the perspective of the use-case it does not make much sense to be able to have an empty document,
 			# however, it is still good to be able to pass an empty document through the pipeline,
 			# because it allows the user to parse the other kinds of docx data through this tool
-			# "E.g. User wants to check and standardize the style hierarchy"
-			# Raises a warning instead of an error
+			# "E.g. User wants to check and normalize the style hierarchy"
+			# Raises a warning instead of an error and proceed
 			print("\033[33mWarning: No textual content detected inside the document...\033[0m")
 			return []
 

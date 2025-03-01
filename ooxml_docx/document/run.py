@@ -146,7 +146,7 @@ class Run(OoxmlElement):
 		tree = Tree("[bold]Run[/bold]")
 
 		if self.style is not None:
-			tree.add(f"[bold]Style[/bold cyan]: '{self.style.id}'")
+			tree.add(f"[bold]Style[/bold]: '{self.style.id}'")
 
 		if len(self.content) != 0:
 			content_tree = tree.add("[bold cyan]Content[/bold cyan]")

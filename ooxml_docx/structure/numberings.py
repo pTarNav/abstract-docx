@@ -373,6 +373,23 @@ class Numbering(OoxmlElement):
 			level_overrides[level_override.id] = level_override
 
 		return level_overrides
+	
+	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
+		"""_summary_
+
+		:param numbering_style: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		for i, level in self.abstract_numbering.levels.items():
+			if level.style.id == numbering_style.id:
+				return i
+			
+		# Assumption: If the indentation level is marked by the style inside the level object,
+		# only consider the direct abstract numbering, do not go down the chain of style and abstract numbering hierarchy.
+		# ! Might be needed to change in the future if the assumption is not correct...
+
+		raise ValueError("") # TODO
 
 
 class OoxmlNumberings(ArbitraryBaseModel):
@@ -451,10 +468,6 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		
 		# No match found
 		return None
-	
-	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
-		
-		raise ValueError("") # TODO
 
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
