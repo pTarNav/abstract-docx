@@ -233,6 +233,8 @@ class Paragraph(OoxmlElement):
 		if numbering_style_search_result is not None:
 			return numbering_style_search_result
 
+		# TODO: What happens if an external program adds a style reference that does not exist?
+		# TODO: Research by replicating this, if the word program accepts it as valid ooxml then so should I
 		raise ValueError(f"Undefined style reference for style id: {style_id}")
 	
 	@staticmethod
