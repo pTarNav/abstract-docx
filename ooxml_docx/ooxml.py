@@ -3,12 +3,14 @@ from typing import Optional, Any
 
 from lxml import etree
 from lxml.etree import _Element as etreeElement
+from utils.printing import etree_to_str
+
 import re
 
 from utils.pydantic import ArbitraryBaseModel
 
 from rich.tree import Tree
-from utils.rich_tree import rich_tree_to_str
+from utils.printing import rich_tree_to_str
 
 
 class OoxmlElement(ArbitraryBaseModel):
@@ -95,12 +97,13 @@ class OoxmlElement(ArbitraryBaseModel):
 		return query_result_element
 
 	def __str__(self) -> str:
+		return self.element_str()
+	
+	def element_str(self) -> str:
 		"""
-		Computes XML element string representation using LXML etree.tostring and decoding to utf-8.
-		:return: XML element string representation.
+		Auxiliary function for when the __str__ method is overwritten
 		"""
-		etree.indent(tree=self.element, space="\t")
-		return etree.tostring(self.element, pretty_print=True, encoding="utf-8").decode("utf-8")
+		return etree_to_str(element=self.element)
 
 
 # Auxiliary type for the result of the .xpath_query method

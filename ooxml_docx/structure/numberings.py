@@ -4,7 +4,7 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from rich.tree import Tree
-from utils.rich_tree import rich_tree_to_str
+from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import RunProperties, ParagraphProperties

@@ -20,7 +20,7 @@ class OoxmlProperties(OoxmlElement):
 
 	def validate(self) -> None:
 		"""
-		Share method between all OOXML properties elements which checks if
+		Shared method between all OOXML properties elements which checks if
 		 the parsed element tag matches with the expected type of properties element.
 
 		:raises ValueError: Raises error if tag validation is failed.
@@ -29,6 +29,7 @@ class OoxmlProperties(OoxmlElement):
 			raise ValueError(
 				f"<{self.__class__.__name__}> requires OOXML <w:{self.tag}> element, received <w:{self.local_name}> instead"
 			)
+	
 
 
 class RunProperties(OoxmlProperties):

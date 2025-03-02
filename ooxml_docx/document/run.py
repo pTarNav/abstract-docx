@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 
 from rich.tree import Tree
-from utils.rich_tree import rich_tree_to_str
+from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.structure.properties import RunProperties
