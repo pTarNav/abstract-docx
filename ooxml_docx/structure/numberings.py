@@ -1,6 +1,10 @@
 from __future__ import annotations
 from typing import Optional
+
 from utils.pydantic import ArbitraryBaseModel
+
+from rich.tree import Tree
+from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
@@ -12,7 +16,7 @@ class NumberingStyle(_NumberingStyle):
 
 	Important: This is the complete version and the one that should be used for imports.
 	
-	:param NumberingStyle: _description_
+	:param _NumberingStyle: Incomplete class of NumberingStyle defined in 'styles.py'.
 	"""
 	abstract_numbering_parent: Optional[AbstractNumbering] = None
 	abstract_numbering_children: Optional[list[AbstractNumbering]] = None
@@ -81,7 +85,8 @@ class Level(OoxmlElement):
 		raise ValueError("")  # TODO
 
 	def __str__(self) -> str:
-		return f"{self.id}"
+		return f"[bold]{self.id}[/bold]: '{self.style.id if self.style is not None else ''}'"
+
 
 class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	"""_summary_
@@ -90,6 +95,20 @@ class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	style: Optional[NumberingStyle] = None  # numStyleLink
 	style_children: Optional[list[NumberingStyle]] = None  # styleLink
 
+	def __str__(self) -> str:
+		return rich_tree_to_str(self._tree_str_())
+	
+	def _tree_str_(self) -> Tree:
+		tree = Tree("[bold cyan]Associated styles[/bold cyan]")
+
+		if self.style is not None:
+			tree.add(f"[bold]Parent[/bold]: '{self.style.id}'")
+		
+		if self.style_children is not None:
+			s = ", ".join([f"'{style.id}'" for style in self.style_children])
+			tree.add(f"[bold]Children[/bold]: [{s}]")
+
+		return tree
 
 class AbstractNumbering(OoxmlElement):
 	"""_summary_
@@ -119,7 +138,7 @@ class AbstractNumbering(OoxmlElement):
 			levels=cls._parse_levels(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles),
 			associated_styles=cls._parse_associated_styles(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles)
 		)
-		abstract_numbering._associate_to_styles()
+		abstract_numbering._associate_to_levels_and_styles()
 
 		return abstract_numbering
 		
@@ -174,29 +193,42 @@ class AbstractNumbering(OoxmlElement):
 						properties=style_child.properties
 					))
 		
-		return AbstractNumberingAssociatedStyles(style=style, style_children=style_children)
+		return (
+			AbstractNumberingAssociatedStyles(style=style, style_children=style_children) 
+			if style is not None or style_children is not None else None
+		)
 	
-	def _associate_to_styles(self) -> None:
+	def _associate_to_levels_and_styles(self) -> None:
 		# Associate abstract numbering to each one of its levels
 		for level in self.levels.values():
 			level.abstract_numbering = self
 		
-		if self.associated_styles.style is not None:
-			# Associate to the numbering style which the abstract numbering is based on (<w:numStyleLink>)
-			if self.associated_styles.style.abstract_numbering_children is None:
-				self.associated_styles.style.abstract_numbering_children = []
-			self.associated_styles.style.abstract_numbering_children.append(self)
+		if self.associated_styles is not None:
+			if self.associated_styles.style is not None:
+				# Associate to the numbering style which the abstract numbering is based on (<w:numStyleLink>)
+				if self.associated_styles.style.abstract_numbering_children is None:
+					self.associated_styles.style.abstract_numbering_children = []
+				self.associated_styles.style.abstract_numbering_children.append(self)
 
-		if (self.associated_styles.style_children is not None and len(self.associated_styles.style_children) != 0):
-			# Associate to the numbering styles which are based on the abstract numbering (<w:styleLink>)
-			for style in self.associated_styles.style_children:
-				style.abstract_numbering_parent = self
+			if self.associated_styles.style_children is not None:
+				# Associate to the numbering styles which are based on the abstract numbering (<w:styleLink>)
+				for style in self.associated_styles.style_children:
+					style.abstract_numbering_parent = self
 
-	def __str__(self) -> str:
-		s = f"\033[1m{self.id}\033[0m: '{self.name if self.name is not None else ''}'"
-		s += f" [{','.join([level.__str__() for level in self.levels])}]\n"
+	def __str__(self) -> str:		
+		return rich_tree_to_str(self._tree_str_())
+	
+	def _tree_str_(self) -> Tree:
+		tree = Tree(f"[bold]{self.id}[/bold]: '{self.name if self.name is not None else ''}'")
 
-		return s
+		if self.associated_styles is not None:
+			tree.add(self.associated_styles._tree_str_())
+
+		level_tree = tree.add("[bold cyan]Levels[/bold cyan]")
+		for level in self.levels.values():
+			level_tree.add(level.__str__())
+
+		return tree
 
 
 class LevelOverride(OoxmlElement):
@@ -252,6 +284,7 @@ class LevelOverride(OoxmlElement):
 			))
 
 		return level
+
 
 class Numbering(OoxmlElement):
 	"""
@@ -340,6 +373,23 @@ class Numbering(OoxmlElement):
 			level_overrides[level_override.id] = level_override
 
 		return level_overrides
+	
+	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
+		"""_summary_
+
+		:param numbering_style: _description_
+		:raises ValueError: _description_
+		:return: _description_
+		"""
+		for i, level in self.abstract_numbering.levels.items():
+			if level.style.id == numbering_style.id:
+				return i
+			
+		# Assumption: If the indentation level is marked by the style inside the level object,
+		# only consider the direct abstract numbering, do not go down the chain of style and abstract numbering hierarchy.
+		# ! Might be needed to change in the future if the assumption is not correct...
+
+		raise ValueError("") # TODO
 
 
 class OoxmlNumberings(ArbitraryBaseModel):
@@ -374,13 +424,11 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		ooxml_abstract_numberings: Optional[list[OoxmlElement]] = ooxml_numbering_part.ooxml.xpath_query(
 			query="./w:abstractNum"
 		)
-		if ooxml_abstract_numberings is None:
-			return []
-		
+
 		return [
 			AbstractNumbering.parse(ooxml_abstract_numbering=ooxml_abstract_numbering, styles=styles)
 			for ooxml_abstract_numbering in ooxml_abstract_numberings
-		]
+		] if ooxml_abstract_numberings is not None else []
 
 		
 	@staticmethod
@@ -401,9 +449,32 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			for ooxml_numbering in ooxml_numberings
 		]
 	
+	def find(self, id: int) -> Optional[Numbering]:
+		"""
+		Helper function for searching a numbering based on its id inside the numbering tree.
+
+		Only numberings are of interest because any other outside ooxml element will always reference a numbering,
+		 not an abstract numbering. 
+		(With the only exception being the inheritance system between styles and abstract numberings properties)
+
+		Because ids are assumed to be unique, this function will return the first match.
+
+		:param id: Id of the numbering being searched.
+		:return: Result of the search, a single Numbering object or None when no match is found.
+		"""
+		for numbering in self.numberings:
+			if numbering.id == id:
+				return numbering
+		
+		# No match found
+		return None
+
 	def __str__(self) -> str:
-		s = "\033[36m\033[1mAbstract numberings\033[0m\n"
+		return rich_tree_to_str(self._tree_str_())
+	
+	def _tree_str_(self) -> Tree:
+		tree = Tree("[bold cyan]:input_numbers: Abstract numberings[/bold cyan]")
 		for i, abstract_numbering in enumerate(self.abstract_numberings):
-			arrow = "\u2514\u2500\u2500\u25BA" if i==len(self.abstract_numberings)-1 else "\u251c\u2500\u2500\u25BA"
-			s += f" {arrow} {abstract_numbering.__str__()}"
-		return s
+			tree.add(abstract_numbering._tree_str_())
+		
+		return tree

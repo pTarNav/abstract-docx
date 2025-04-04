@@ -2,9 +2,13 @@ from __future__ import annotations
 from typing import Optional, Any
 from enum import Enum
 from pydantic import model_validator
-from utils.pydantic import ArbitraryBaseModel
 
 import re
+
+from utils.pydantic import ArbitraryBaseModel
+
+from rich.tree import Tree
+from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import (
@@ -16,7 +20,10 @@ from ooxml_docx.structure.properties import (
 
 class Style(OoxmlElement):
 	"""
-
+	Representation of an OOXML style element.
+	An OOXML style is a named collection of content specific OOXML properties.
+	Styles have a hierarchical structure, where one can construct a style (child) from another style (parent),
+	 inheriting all the OOXML properties of the parent style.
 	"""
 	id: str
 	name: Optional[str] = None
@@ -25,10 +32,10 @@ class Style(OoxmlElement):
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> Style:
-		"""_summary_
-
-		:param ooxml_style: _description_
-		:return: _description_
+		"""
+		Reads the contents of an OOXML style element.
+		:param ooxml_style: Raw OOXML style element.
+		:return: Parsed style representation.
 		"""
 		name: Optional[str] = ooxml_style.xpath_query(query="./w:name/@w:val", singleton=True)
 
@@ -39,57 +46,29 @@ class Style(OoxmlElement):
 		)
 	
 	def __str__(self) -> str:
-		return self._tree_str_()
+		return rich_tree_to_str(self._tree_str_())
 	
-	def _tree_str_(self, depth: int = 0, last: bool = False, line_state: list[bool] = None) -> str:
-		"""
-		Computes string representation of a style.
 
-		:param depth: Indentation depth integer, defaults to 0.
-		:param last: Package is the last one from the parent packages list, defaults to False.
-		:param line_state: List of booleans indicating whether to include vertical connection for each previous indentation depth,
-			defaults to None to avoid mutable list initialization unexpected behavior.
-		:return: Package string representation.
-		"""
-		if line_state is None:
-			line_state = []
-		
-		# Compute string representation of package header
-		prefix = " " if depth > 0 else ""
-		for level_state in line_state:
-			prefix += "\u2502    " if level_state else "     "
-		arrow = prefix + (
-			("\u2514\u2500\u2500\u25BA" if last else "\u251c\u2500\u2500\u25BA")
-			if depth > 0 else ""
-		)
-		s = f"{arrow} \033[1m{self.id}\033[0m: '{self.name if self.name is not None else ''}'\n"
-
-		# Update the line state for the current depth
-		if depth > 0:
-			if depth >= len(line_state):
-				line_state.append(not last)
-			else:
-				line_state[depth] = not last
+	def _tree_str_(self) -> Tree:
+		tree = Tree(f"[bold]{self.id}[/bold]: '{self.name if self.name is not None else ''}'")
 
 		if self.children is not None:
 			# Sort children names alphanumerically
-			sorted_children = sorted(self.children, key=lambda x: (
+			sorted_children = sorted(
+				self.children, key=lambda x: (
 					re.sub(r'[^a-zA-Z]+', '', x.name),
 					int(re.search(r'(\d+)', x.name).group(1)) if re.search(r'(\d+)', x.name) else 0
-			))
-
-			for i, style in enumerate(sorted_children):
-				s += style._tree_str_(
-					depth=depth+1, last=i==len(self.children)-1, line_state=line_state[:]  # Pass-by-value
 				)
-		
-		return s
+			)
+			for children in sorted_children:
+				tree.add(children._tree_str_())
+
+		return tree
 
 
 class DocDefaults(Style):
 	"""
 
-	:param Style: Inherits attributes from Style.
 	"""
 	default_paragraph_properties: Optional[ParagraphProperties] = None
 	default_run_properties: Optional[RunProperties] = None
@@ -108,8 +87,7 @@ class DocDefaults(Style):
 
 class RunStyle(Style):
 	"""
-	Represents a .docx run style.
-	:param Style: Inherits attributes from Style.
+	Represents an OOXML run style.
 	"""
 	properties: Optional[RunProperties] = None
 	
@@ -130,8 +108,8 @@ class RunStyle(Style):
 
 class ParagraphStyle(Style):
 	"""
-	Represents a .docx paragraph style. Which can contain both paragraph and run properties.
-	:param Style: Inherits attributes from Style.
+	Represents an OOXML paragraph style.
+	Which can contain both paragraph and run properties.
 	"""
 	properties: Optional[ParagraphProperties] = None
 	run_properties: Optional[RunProperties] = None
@@ -155,9 +133,8 @@ class ParagraphStyle(Style):
 
 class TableStyle(Style):
 	"""
-	Represents a .docx table style.
+	Represents an OOXML table style.
 	Which can contain general and conditional table properties, as well as row and cell properties.
-	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[TableProperties] = None
 	conditional_properties: Optional[TableConditionalProperties] = None
@@ -189,12 +166,10 @@ class TableStyle(Style):
 
 class _NumberingStyle(Style):
 	"""
-	Represents a .docx numbering style.
+	Represents an OOXML numbering style.
 	Which can contain numbering properties, and be inherited by or inherit abstract numbering definitions properties
 	
 	Important: Import NumberingStyle from ooxml_docx.numbering as this definition is incomplete!
-
-	:param Style: Inherits attributes from Style.
 	"""
 	properties: Optional[NumberingProperties] = None
 
@@ -221,6 +196,7 @@ class OoxmlStyleTypes(Enum):
 	NUMBERING = "numbering"
 
 
+# Map to obtain the respective style class based on the enumeration
 OOXML_STYLE_TYPES_CLASSES: dict[OoxmlStyleTypes, type[Style]] = {
 	OoxmlStyleTypes.RUN: RunStyle,
 	OoxmlStyleTypes.PARAGRAPH: ParagraphStyle,
@@ -302,19 +278,28 @@ class OoxmlStylesRoots(ArbitraryBaseModel):
 		return roots
 
 	def __str__(self) -> str:
-		s = "\033[36m\033[1mRun styles\033[0m\n"
+		return rich_tree_to_str(self._tree_str_())
+
+	def _tree_str_(self) -> Tree:
+		tree = Tree(":artist_palette: [bold cyan]Styles[/bold cyan]")
+		
+		run_styles_tree = tree.add("[bold cyan]Run styles[/bold cyan]")
 		for i, style in enumerate(self.run):
-			s += style._tree_str_(depth=1, last=i==len(self.run)-1)
-		s += "\033[36m\033[1mParagraph styles\033[0m\n"
+			run_styles_tree.add(style._tree_str_())
+
+		paragraph_styles_tree = tree.add("[bold cyan]Paragraph styles[/bold cyan]")
 		for i, style in enumerate(self.paragraph):
-			s += style._tree_str_(depth=1, last=i==len(self.paragraph)-1)
-		s += "\033[36m\033[1mTable styles\033[0m\n"
+			paragraph_styles_tree.add(style._tree_str_())
+
+		table_styles_tree = tree.add("[bold cyan]Table styles[/bold cyan]")
 		for i, style in enumerate(self.table):
-			s += style._tree_str_(depth=1, last=i==len(self.table)-1)
-		s += "\033[36m\033[1mNumbering styles\033[0m\n"
+			table_styles_tree.add(style._tree_str_())
+
+		numbering_styles_tree = tree.add("[bold cyan]Numbering styles[/bold cyan]")
 		for i, style in enumerate(self.numbering):
-			s += style._tree_str_(depth=1, last=i==len(self.numbering)-1)
-		return s
+			numbering_styles_tree.add(style._tree_str_())
+
+		return tree
 
 
 class OoxmlStyles(ArbitraryBaseModel):
@@ -375,15 +360,16 @@ class OoxmlStyles(ArbitraryBaseModel):
 		)
 	
 	def find(self, id: str, type: Optional[OoxmlStyleTypes] = None) -> Optional[Style]:
-		"""_summary_
+		"""
+		Helper function for searching a style based on its id and type inside the styles tree roots.
 
 		Because ids are assumed to be unique, this function will return the first match,
 		 where in the case where no style type is specified it will search in the following order:
 			run > paragraph > table > numbering
 
-		:param id: _description_
-		:param type: _description_
-		:return: _description_
+		:param id: Id of the style being searched.
+		:param type: Style type of the style being searched.
+		:return: Result of the search, a single style object or None when no match is found.
 		"""
 		
 		search_space: list[Style] = []
@@ -403,7 +389,7 @@ class OoxmlStyles(ArbitraryBaseModel):
 		for root in search_space:
 			search_result: Optional[Style] = self._find(id=id, root=root)
 			if search_result is not None:
-				return search_result
+				return search_result  # Return the first match
 		
 		# No match found
 		return None
@@ -413,9 +399,9 @@ class OoxmlStyles(ArbitraryBaseModel):
 		Searches the given id inside the given tree and returns the matching style found.
 		If no matches where found, returns None.
 
-		:param id: _description_
-		:param root: _description_
-		:return: _description_
+		:param id: Id of the style being searched.
+		:param root: Style specific tree root being search on.
+		:return: Result of the search, a single style object or None when no match is found.
 		"""
 		if root.id == id:
 			return root

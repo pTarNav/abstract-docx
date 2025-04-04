@@ -3,8 +3,8 @@ from ooxml_docx.ooxml import OoxmlElement
 
 class OoxmlProperties(OoxmlElement):
 	"""
-	Represents an OOXML (Office Open XML) properties element.
-	Where despite a general OOXML properties element not existing in the OOXML standard,
+	Representation of an OOXML properties element.
+	Where, despite a general OOXML properties element not existing in the OOXML standard,
 	 it is helpful to have a general class that will enforce tag validation.
 	
 	Instead of needing to specify the fields for each type of properties element, store as the whole OOXML element.
@@ -20,7 +20,7 @@ class OoxmlProperties(OoxmlElement):
 
 	def validate(self) -> None:
 		"""
-		Share method between all OOXML properties elements which checks if
+		Shared method between all OOXML properties elements which checks if
 		 the parsed element tag matches with the expected type of properties element.
 
 		:raises ValueError: Raises error if tag validation is failed.
