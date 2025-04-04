@@ -29,7 +29,6 @@ class OoxmlProperties(OoxmlElement):
 			raise ValueError(
 				f"<{self.__class__.__name__}> requires OOXML <w:{self.tag}> element, received <w:{self.local_name}> instead"
 			)
-	
 
 
 class RunProperties(OoxmlProperties):

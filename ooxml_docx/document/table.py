@@ -128,6 +128,7 @@ class TableRow(OoxmlElement):
 		tree = Tree("table row")
 		return tree
 
+
 class Table(OoxmlElement):
 	rows: list[TableRow] = []
 
