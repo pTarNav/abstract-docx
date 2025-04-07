@@ -70,7 +70,7 @@ class OoxmlDocx(ArbitraryBaseModel):
 	def build(self) -> None:
 		"""_summary_
 		"""
-		self._structure = OoxmlDocxStructure.load(docx=self)
+		self.structure = OoxmlDocxStructure.load(docx=self)
 
 	def __str__(self):
 		s = f"\U0001F4D1 \033[36m\033[1m'{self.file_path}'\033[0m\n"

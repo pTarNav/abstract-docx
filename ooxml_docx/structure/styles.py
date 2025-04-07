@@ -45,9 +45,22 @@ class Style(OoxmlElement):
 			name=str(name) if name is not None else None,
 		)
 	
+	def fold(self, agg: list[Style]) -> list[Style]:
+		"""_summary_
+
+		:param agg: _description_
+		:return: _description_
+		"""
+		agg.append(self)
+
+		if self.children is not None:
+			for child in self.children:
+				agg = child.fold(agg=agg)
+		
+		return agg
+	
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
-	
 
 	def _tree_str_(self) -> Tree:
 		tree = Tree(f"[bold]{self.id}[/bold]: '{self.name if self.name is not None else ''}'")
@@ -293,7 +306,7 @@ class OoxmlStylesRoots(ArbitraryBaseModel):
 					if next_id not in tree_map.keys():
 						raise KeyError(f"Next paragraph style '{next_id}' not found in styles")
 					# Update next relationship
-					tree_map[paragraph_style_id].next = tree_map[next_id]
+					tree_map[paragraph_style_id].next_paragraph_style = tree_map[next_id]
 
 		return roots
 
@@ -439,7 +452,28 @@ class OoxmlStyles(ArbitraryBaseModel):
 		return None
 	
 	def link_run_and_paragraph_styles(self) -> None:
-		pass
+		"""_summary_
+		For there to exist a valid linkage the link property must exist in both styles being linked.
+		There can only exist one link element to establish a single pairing between a paragraph style and a character style.
+		Therefore, chain of linkages are not possible through this mechanism, only by inheritance itself:
+			"<w:link> -> <w:basedOn> -> <w:link> -> ..."
+		"""
+		# Fold the tree structures of the paragraph styles roots into a traversable list
+		folded_paragraph_styles_tree: list[ParagraphStyle] = []
+		for paragraph_style_root in self.roots.paragraph:
+			folded_paragraph_styles_tree = paragraph_style_root.fold(agg=folded_paragraph_styles_tree)
+		
+		for paragraph_style in folded_paragraph_styles_tree:
+			linked_run_style_id: Optional[str] = paragraph_style.xpath_query(query="./w:link/@w:val", singleton=True)
+			if linked_run_style_id is not None:
+				linked_run_style: Optional[RunStyle] = self.find(id=linked_run_style_id, type=OoxmlStyleTypes.RUN)
+				if linked_run_style is None:
+					raise KeyError(f"Linked run style '{linked_run_style_id}' not found in styles")
+				# Check that the run style also has a linkage reference to the current paragraph style
+				linked_paragraph_style_id: Optional[str] = paragraph_style.xpath_query(query="./w:link/@w:val", singleton=True)
+				if linked_paragraph_style_id is not None and linked_paragraph_style_id == paragraph_style.id:
+					paragraph_style.linked_run_style = linked_run_style
+					linked_run_style.linked_paragraph_style = paragraph_style
 
 	def __str__(self) -> str:
 		return self.roots.__str__()
