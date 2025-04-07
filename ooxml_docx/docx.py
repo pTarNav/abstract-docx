@@ -42,7 +42,7 @@ class OoxmlDocx(ArbitraryBaseModel):
 	ooxml: OoxmlPackage
 
 	# TODO: Raise error to tell user that .build() should be called first to access it
-	structure: Optional[OoxmlDocxStructure] = None
+	_structure: Optional[OoxmlDocxStructure] = None
 
 	@classmethod
 	def read(cls, file_path: str) -> OoxmlDocx:
@@ -66,8 +66,13 @@ class OoxmlDocx(ArbitraryBaseModel):
 	def build(self):
 		"""_summary_
 		"""
-		self.structure = OoxmlDocxStructure.load(docx=self)
+		self._structure = OoxmlDocxStructure.load(docx=self)
 
+	@property
+	def structure(self) -> OoxmlDocxStructure:
+		if self._structure is None:
+			raise ValueError("OOXML docx structure has not been built yet. Please call '.build()' method first.")
+		return self._structure
 	
 	def __str__(self):
 		s = f"\U0001F4D1 \033[36m\033[1m'{self.file_path}'\033[0m\n"
