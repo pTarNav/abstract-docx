@@ -8,6 +8,8 @@ from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization.styles_normalization import styles_normalization
 
 
+
+
 class AbstractDocx(ArbitraryBaseModel):
 	"""
 
