@@ -390,7 +390,7 @@ class OoxmlStyles(ArbitraryBaseModel):
 
 		return DocDefaults(
 			element=ooxml_doc_defaults.element,
-			id="__DocDefaults__",
+			id="__DocDefaults__",  # TODO: what happens if for some reason there already exists a style with this id?
 			default_paragraph_properties=ParagraphProperties(ooxml=default_pPr) if default_pPr is not None else None,
 			default_run_properties=RunProperties(ooxml=default_rPr) if default_rPr is not None else None
 		)
