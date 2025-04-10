@@ -13,7 +13,7 @@ class FontSize(float):
 	@classmethod
 	def default(cls) -> FontSize:
 		# TODO: investigate further about default font size
-		return 1.0
+		return cls(1.0)
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontSize]:
@@ -23,20 +23,20 @@ class FontSize(float):
 			
 			return cls.default()
 
-		return float(v)
+		return cls(float(v))
 
 
 class FontColor(Color):
 	@classmethod
 	def default(cls) -> FontColor:
-		return Color(color="black")
+		return cls(Color(color="black"))
 
 
 class FontScript(Enum):
 	"""
 	Defaults to normal
 	"""
-	normal = None
+	normal = "NORMAL"
 	superscript = "SUPERSCRIPT"
 	subscript = "SUBSCRIPT"
 
@@ -59,10 +59,21 @@ class FontScript(Enum):
 		}.get(v, cls.default())
 
 
-class ToggleProperty(bool):
+class ToggleProperty(int):  # Subclass of int, because python will not let me do a subclass of bool for some ungodly reason
+	def __new__(cls, value):
+		# Normalize the value: any truthy value becomes 1, falsey becomes 0.
+		normalized_value = 1 if value else 0
+		return super().__new__(cls, normalized_value)
+	def __str__(self):
+		# Print as a boolean string for clarity.
+		return "True" if self else "False"
+	def __repr__(self):
+		# Print as a boolean string for clarity.
+		return "True" if self else "False"
+	
 	@classmethod
 	def default(cls) -> ToggleProperty:
-		return False
+		return cls(False)
 	
 	@staticmethod
 	def _from_existing_ooxml_val_str(v: str) -> bool:
@@ -86,9 +97,9 @@ class ToggleProperty(bool):
 
 		# If the element exists, but no val is specified it just means that is an implicit True
 		if v is None:
-			return True
+			return cls(True)
 
-		return cls._from_existing_ooxml_val_str(v=v)
+		return cls(cls._from_existing_ooxml_val_str(v=v))
 
 
 class Underline(ToggleProperty):
@@ -135,7 +146,10 @@ class RunStyleProperties(ArbitraryBaseModel):
 				font_size=FontSize.from_ooxml_val(
 					v=run_properties.xpath_query(query="./w:sz/@w:val", singleton=True), must_default=must_default
 				),
-				color=Color("black"),  # TODO: actually implement color parsing
+				font_script=FontScript.from_ooxml_val(
+					v=run_properties.xpath_query(query="./w:vertAlign/@w:val", singleton=True), must_default=must_default
+				),
+				font_color=FontColor.default(),  # TODO: actually implement color parsing
 				bold=ToggleProperty.from_ooxml(
 					el=run_properties.xpath_query(query="./w:b", singleton=True), must_default=must_default
 				),
@@ -144,9 +158,6 @@ class RunStyleProperties(ArbitraryBaseModel):
 				),				
 				underline=Underline.from_ooxml(
 					el=run_properties.xpath_query(query="./w:u", singleton=True), must_default=must_default
-				),
-				script=FontScript.from_ooxml_val(
-					v=run_properties.xpath_query(query="./w:vertAlign/@w:val", singleton=True), must_default=must_default
 				)
 			)
 
@@ -191,7 +202,7 @@ class Justification(Enum):
 class IndentationValue(float):
 	@classmethod
 	def default(cls) -> IndentationValue:
-		return 0.0
+		return cls(0.0)
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[IndentationValue]:
@@ -201,7 +212,7 @@ class IndentationValue(float):
 			
 			return cls.default()
 
-		return float(v)
+		return IndentationValue(float(v))
 
 
 class Indentation(ArbitraryBaseModel):
@@ -215,28 +226,35 @@ class Indentation(ArbitraryBaseModel):
 	first: Optional[IndentationValue] = None
 
 	@classmethod
+	def default(cls) -> Indentation:
+		return cls(start=IndentationValue.default(), end=IndentationValue.default(), first=IndentationValue.default())
+
+	@classmethod
 	def from_ooxml(cls, el: Optional[OoxmlElement], must_default: bool=False) -> Optional[Indentation]:
 		"""
 
 		"""
-		if not must_default and el is None:
-			return None
-		
-		first: Optional[float] = IndentationValue(v=el.xpath_query(query="./@w:hanging", singleton=True))
-		if first is None:
-			first = IndentationValue(v=el.xpath_query(query="./@w:firstLine", singleton=True), must_default=must_default)
-		else:
-			first = -first
+		if el is not None:			
+			first: Optional[float] = IndentationValue(v=el.xpath_query(query="./@w:hanging", singleton=True))
+			if first is None:
+				first = IndentationValue(v=el.xpath_query(query="./@w:firstLine", singleton=True), must_default=must_default)
+			else:
+				first = -first
 
-		return cls(
-			start=IndentationValue.from_ooxml_val(
-				v=el.xpath_query(query="./@w:start|./@w:left", singleton=True), must_default=must_default
-			),
-			end=IndentationValue.from_ooxml_val(
-				v=el.xpath_query(query="./@w:end|./@w:right", singleton=True), must_default=must_default
-			),
-			first=first
-		)
+			return cls(
+				start=IndentationValue.from_ooxml_val(
+					v=el.xpath_query(query="./@w:start|./@w:left", singleton=True), must_default=must_default
+				),
+				end=IndentationValue.from_ooxml_val(
+					v=el.xpath_query(query="./@w:end|./@w:right", singleton=True), must_default=must_default
+				),
+				first=first
+			)
+
+		if must_default:
+			return cls.default()
+			
+		return cls()
 
 
 class ParagraphStyleProperties(ArbitraryBaseModel):
@@ -245,7 +263,7 @@ class ParagraphStyleProperties(ArbitraryBaseModel):
 
 	@classmethod
 	def default(cls) -> RunStyleProperties:
-		return cls(justification=Justification.default(), indentation=Indentation())
+		return cls(justification=Justification.default(), indentation=Indentation().default())
 	
 	@classmethod
 	def from_ooxml(
@@ -257,7 +275,7 @@ class ParagraphStyleProperties(ArbitraryBaseModel):
 					v=paragraph_properties.xpath_query(query="./w:jc/@w:val", singleton=True), must_default=must_default
 				),
 				indentation=Indentation.from_ooxml(
-					element=paragraph_properties.xpath_query(query="./w:ind", singleton=True), must_default=must_default
+					el=paragraph_properties.xpath_query(query="./w:ind", singleton=True), must_default=must_default
 				)
 			)
 	
@@ -289,7 +307,20 @@ class StyleProperties(ArbitraryBaseModel):
 	table_style_properties: Optional[TableStyleProperties] = None
 
 	@classmethod
-	def from_ooxml(cls, el: )
+	def from_ooxml(
+		cls,
+		run_properties: Optional[OOXML_PROPERTIES.RunProperties],
+		paragraph_properties: Optional[OOXML_PROPERTIES.ParagraphProperties],
+		must_default: bool=False
+	) -> StyleProperties:
+		return cls(
+			run_style_properties=RunStyleProperties.from_ooxml(
+				run_properties=run_properties, must_default=must_default
+			),
+			paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
+				paragraph_properties=paragraph_properties, must_default=must_default
+			)
+		)
 
 
 class Style(ArbitraryBaseModel):
