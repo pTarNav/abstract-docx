@@ -32,7 +32,7 @@ class FontColor(Color):
 		return Color(color="black")
 
 
-class Script(Enum):
+class FontScript(Enum):
 	"""
 	Defaults to normal
 	"""
@@ -41,11 +41,11 @@ class Script(Enum):
 	subscript = "SUBSCRIPT"
 
 	@classmethod
-	def default(cls) -> Script:
+	def default(cls) -> FontScript:
 		return cls.normal
 
 	@classmethod
-	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[Script]:
+	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontScript]:
 		"""
 		Convert the OOXML attribute value to the corresponding Script enum.
 		"""
@@ -59,61 +59,93 @@ class Script(Enum):
 		}.get(v, cls.default())
 
 
-def toggle_str_to_bool(s: Optional[str]) -> bool:
-	if s is None:
-		return True
+class ToggleProperty(bool):
+	@classmethod
+	def default(cls) -> ToggleProperty:
+		return False
 	
-	match s.lower():
-		case "1":
+	@staticmethod
+	def _from_existing_ooxml_val_str(v: str) -> bool:
+		match str(v).lower():
+			case "1":
+				return True
+			case "true":
+				return True
+			case _:
+				return False
+
+	@classmethod
+	def from_ooxml(cls, el: Optional[OoxmlElement], must_default: bool=False) -> Optional[ToggleProperty]:
+		if el is None:
+			if not must_default:
+				return None
+			
+			return cls.default()
+
+		v: Optional[str] = el.xpath_query(query="./@w:val", singleton=True)
+
+		# If the element exists, but no val is specified it just means that is an implicit True
+		if v is None:
 			return True
-		case "true":
-			return True
-		case _:
-			return False
+
+		return cls._from_existing_ooxml_val_str(v=v)
+
+
+class Underline(ToggleProperty):
+	# Even though it is not a toggle property, we will treat it as such because of the tool intended use
+	
+	@staticmethod
+	def _from_existing_ooxml_val_str(v: str) -> bool:
+		"""
+		Override ToggleProperty class, since it is not actually an ooxml toggle property, the logic is a little bit different.
+		"""
+		match str(v).lower():
+			case "none":
+				return False
+			case _:
+				return True
 
 
 class RunStyleProperties(ArbitraryBaseModel):
 	font_size: Optional[FontSize] = None
 	font_color: Optional[FontColor] = None
-	bold: Optional[bool] = None
-	italic: Optional[bool] = None
-	underline: Optional[bool] = None
-	script: Optional[Script] = None
+	font_script: Optional[FontScript] = None
+	bold: Optional[ToggleProperty] = None
+	italic: Optional[ToggleProperty] = None
+	underline: Optional[Underline] = None  
 
 	@classmethod
 	def default(cls) -> RunStyleProperties:
 		
 		return cls(
 			font_size=FontSize.default(),
-			color=FontColor.default(),
-			bold=False,
-			italic=False,
-			underline=False,
-			script=Script.default()
+			font_color=FontColor.default(),
+			font_script=FontScript.default(),
+			bold=ToggleProperty.default(),
+			italic=ToggleProperty.default(),
+			underline=Underline.default()
 		)
 	
 	@classmethod
 	def from_ooxml(
 		cls, run_properties: Optional[OOXML_PROPERTIES.RunProperties], must_default: bool=False
 	) -> RunStyleProperties:
-		if run_properties is not None:	
-			# TODO clean this toggle shit, where: it can either be true, false or none
-			bold_element: Optional[OoxmlElement] = run_properties.xpath_query(query="./w:b", singleton=True)
-			italic_element: Optional[OoxmlElement] = run_properties.xpath_query(query="./w:i", singleton=True)
-			underline_element: Optional[OoxmlElement] = run_properties.xpath_query(query="./w:u", singleton=True)
-
-			underline_element.xpath_query(query="./@w:val", singleton=True) # TODO capture false when val is "none"
-
+		if run_properties is not None:
 			return cls(
 				font_size=FontSize.from_ooxml_val(
 					v=run_properties.xpath_query(query="./w:sz/@w:val", singleton=True), must_default=must_default
 				),
 				color=Color("black"),  # TODO: actually implement color parsing
-				bold=toggle_str_to_bool(bold_element.xpath_query(query="./@w:val", singleton=True)) if bold_element is not None else None,
-				italic=toggle_str_to_bool(italic_element.xpath_query(query="./@w:val", singleton=True)) if italic_element is not None else None,
-				# Even though it is not a toggle property, we will treat it as such because of the tool intended use
-				underline=toggle_str_to_bool(),
-				script=Script.from_ooxml_val(
+				bold=ToggleProperty.from_ooxml(
+					el=run_properties.xpath_query(query="./w:b", singleton=True), must_default=must_default
+				),
+				italic=ToggleProperty.from_ooxml(
+					el=run_properties.xpath_query(query="./w:i", singleton=True), must_default=must_default
+				),				
+				underline=Underline.from_ooxml(
+					el=run_properties.xpath_query(query="./w:u", singleton=True), must_default=must_default
+				),
+				script=FontScript.from_ooxml_val(
 					v=run_properties.xpath_query(query="./w:vertAlign/@w:val", singleton=True), must_default=must_default
 				)
 			)
