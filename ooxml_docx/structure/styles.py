@@ -457,6 +457,7 @@ class OoxmlStyles(ArbitraryBaseModel):
 		Therefore, chain of linkages are not possible through this mechanism, only by inheritance itself:
 			"<w:link> -> <w:basedOn> -> <w:link> -> ..."
 		"""
+		
 		# Fold the tree structures of the paragraph styles roots into a traversable list
 		folded_paragraph_styles_tree: list[ParagraphStyle] = []
 		for paragraph_style_root in self.roots.paragraph:
@@ -468,8 +469,9 @@ class OoxmlStyles(ArbitraryBaseModel):
 				linked_run_style: Optional[RunStyle] = self.find(id=linked_run_style_id, type=OoxmlStyleTypes.RUN)
 				if linked_run_style is None:
 					raise KeyError(f"Linked run style '{linked_run_style_id}' not found in styles")
+				
 				# Check that the run style also has a linkage reference to the current paragraph style
-				linked_paragraph_style_id: Optional[str] = paragraph_style.xpath_query(query="./w:link/@w:val", singleton=True)
+				linked_paragraph_style_id: Optional[str] = linked_run_style.xpath_query(query="./w:link/@w:val", singleton=True)
 				if linked_paragraph_style_id is not None and linked_paragraph_style_id == paragraph_style.id:
 					paragraph_style.linked_run_style = linked_run_style
 					linked_run_style.linked_paragraph_style = paragraph_style
