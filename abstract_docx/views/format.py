@@ -217,9 +217,9 @@ class IndentationValue(float):
 
 class Indentation(ArbitraryBaseModel):
 	"""
-	|			|<--first-->Aaaaa|		   |
-	|<--start-->|aaaaaaaaaaaaaaaa|<--end-->|
-	|			|aaaaaaaaaa.     |		   |
+	|			|<--first-->Lorem|		   |
+	|<--start-->|ipsum dolor, sit|<--end-->|
+	|			|amet.           |		   |
 	"""
 	start: Optional[IndentationValue] = None
 	end: Optional[IndentationValue] = None
@@ -235,11 +235,13 @@ class Indentation(ArbitraryBaseModel):
 
 		"""
 		if el is not None:			
-			first: Optional[float] = IndentationValue(v=el.xpath_query(query="./@w:hanging", singleton=True))
+			first: Optional[float] = IndentationValue.from_ooxml_val(v=el.xpath_query(query="./@w:hanging", singleton=True))
 			if first is None:
-				first = IndentationValue(v=el.xpath_query(query="./@w:firstLine", singleton=True), must_default=must_default)
+				first = IndentationValue.from_ooxml_val(
+					v=el.xpath_query(query="./@w:firstLine", singleton=True), must_default=must_default
+				)
 			else:
-				first = -first
+				first = IndentationValue(-first)
 
 			return cls(
 				start=IndentationValue.from_ooxml_val(
@@ -259,7 +261,7 @@ class Indentation(ArbitraryBaseModel):
 
 class ParagraphStyleProperties(ArbitraryBaseModel):
 	justification: Optional[Justification] = None
-	indentation: Optional[Indentation] = None
+	indentation: Indentation = Indentation()
 
 	@classmethod
 	def default(cls) -> RunStyleProperties:
@@ -309,8 +311,8 @@ class StyleProperties(ArbitraryBaseModel):
 	@classmethod
 	def from_ooxml(
 		cls,
-		run_properties: Optional[OOXML_PROPERTIES.RunProperties],
-		paragraph_properties: Optional[OOXML_PROPERTIES.ParagraphProperties],
+		run_properties: Optional[OOXML_PROPERTIES.RunProperties]=None,
+		paragraph_properties: Optional[OOXML_PROPERTIES.ParagraphProperties]=None,
 		must_default: bool=False
 	) -> StyleProperties:
 		return cls(
