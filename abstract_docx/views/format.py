@@ -24,7 +24,7 @@ class FontSize(float):
 			return cls.default()
 
 		return cls(float(v))
-
+	
 
 class FontColor(Color):
 	@classmethod
@@ -166,6 +166,19 @@ class RunStyleProperties(ArbitraryBaseModel):
 		
 		return cls()
 
+	@classmethod
+	def aggregate_ooxml(
+		cls, agg: RunStyleProperties, add: RunStyleProperties, default: RunStyleProperties
+	) -> RunStyleProperties:
+		return cls(
+			font_size=add.font_size if add.font_size is not None else agg.font_size,
+			font_color=add.font_color if add.font_color is not None else agg.font_color,
+			font_script=add.font_script if add.font_script is not None else agg.font_script,
+			# TODO: add table style possible toggle properties into the xor
+			bold=default.bold or ToggleProperty(bool(add.bold) ^ agg.bold),
+			italic=default.italic or ToggleProperty(bool(add.italic) ^ agg.italic),
+			underline=default.underline or Underline(bool(add.underline) ^ agg.underline)
+		)
 
 class Justification(Enum):
 	"""
@@ -285,6 +298,17 @@ class ParagraphStyleProperties(ArbitraryBaseModel):
 			return cls.default()
 		
 		return cls()
+	
+	@classmethod
+	def aggregate_ooxml(cls, agg: ParagraphStyleProperties, add: ParagraphStyleProperties) -> ParagraphStyleProperties:
+		return cls(
+			justification=add.justification if add.justification is not None else agg.justification,
+			indentation=Indentation(
+				start=add.indentation.start if add.indentation.start is not None else agg.indentation.start,
+				end=add.indentation.end if add.indentation.end is not None else agg.indentation.end,
+				first=add.indentation.first if add.indentation.first is not None else agg.indentation.first
+			)
+		)
 
 
 class TableStyleProperties(ArbitraryBaseModel):
@@ -321,6 +345,17 @@ class StyleProperties(ArbitraryBaseModel):
 			),
 			paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
 				paragraph_properties=paragraph_properties, must_default=must_default
+			)
+		)
+
+	@classmethod
+	def aggregate_ooxml(cls, agg: StyleProperties, add: StyleProperties, default: StyleProperties) -> StyleProperties:
+		return cls(
+			run_style_properties=RunStyleProperties.aggregate_ooxml(
+				agg=agg.run_style_properties, add=add.run_style_properties, default=default.run_style_properties
+			),
+			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
+				agg=agg.paragraph_style_properties, add=add.paragraph_style_properties
 			)
 		)
 
