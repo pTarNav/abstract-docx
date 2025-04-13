@@ -10,10 +10,5 @@ from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
 
 
-from abstract_docx.views.format.styles import Style
-from abstract_docx.views.format.numberings import Numbering
-
-
-class Format(ArbitraryBaseModel):
-	style: Style
-	numbering: Numbering
+class Numbering(ArbitraryBaseModel):
+	pass

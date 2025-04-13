@@ -5,7 +5,7 @@ import copy
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.docx import OoxmlDocx
-from abstract_docx.normalization.styles_normalization import EffectiveStylesFromOoxml
+from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 
 
 
@@ -27,4 +27,5 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	x = AbstractDocx.read(file_path="test/cp2022_10a01.docx")
-	EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
+	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
+	print(y.effective_styles)

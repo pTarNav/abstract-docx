@@ -5,7 +5,7 @@ import ooxml_docx.structure.styles as OOXML_STYLES
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format import Style, StyleProperties
+from abstract_docx.views.format.styles import Style, StyleProperties
 
 
 # TODO: Maybe create an abstract template for the effective styles class, so no matter the source it always contains the same methods
@@ -149,5 +149,3 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 		folded_paragraph_styles: list[OOXML_STYLES.ParagraphStyle] = self._compute_effective_paragraph_and_run_styles()
 		self._merge_linked_effective_paragraph_and_run_styles(folded_paragraph_styles=folded_paragraph_styles)
 		self._compile_remaining_effective_run_styles()
-
-
