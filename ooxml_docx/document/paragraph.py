@@ -165,7 +165,7 @@ class Paragraph(OoxmlElement):
 
 		numbering_parse_result: Optional[tuple[Numbering, int]] = cls._parse_numbering(
 			ooxml_paragraph=ooxml_paragraph,
-			numbering_style=style if isinstance(style, NumberingStyle) else None,  # Only numbering style is relevant
+			style=style,  
 			numberings=numberings
 		)
 
@@ -239,7 +239,7 @@ class Paragraph(OoxmlElement):
 	
 	@staticmethod
 	def _parse_numbering(
-			ooxml_paragraph: OoxmlElement, numbering_style: Optional[NumberingStyle], numberings: OoxmlNumberings
+			ooxml_paragraph: OoxmlElement, style: Optional[NumberingStyle], numberings: OoxmlNumberings
 		) -> Optional[tuple[Numbering, int]]:
 		ooxml_numbering: Optional[NumberingProperties] = ooxml_paragraph.xpath_query(
 			query="./w:pPr/w:numPr", singleton=True
@@ -267,17 +267,23 @@ class Paragraph(OoxmlElement):
 
 			return numbering, indentation_level
 		
-		# Case: Numbering properties via numbering style
-		if numbering_style is not None:
-			numbering_id: int = int(numbering_style.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
-
+		# Case: Numbering properties via numbering style or paragraph style
+		if style is not None:
+			match type(style):
+				case OoxmlStyleTypes.NUMBERING:
+					numbering_id: int = int(style.properties.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
+				case OoxmlStyleTypes.PARAGRAPH:
+					numbering_id: int = int(style.properties.xpath_query(query="./w:numPr/w:numId/@w:val", nullable=False, singleton=True))
+				case _:
+					raise ValueError() # TODO
+			
 			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
 			if numbering is None:
 				# Same reasoning and procedure as in the previous case above
-				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {numbering_style.id=})\033[0m")
+				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m")
 				return None	
 
-			return numbering, numbering.find_numbering_style_level(numbering_style=numbering_style)
+			return numbering, numbering.find_style_level(style=style)
 
 		return None
 

@@ -18,9 +18,11 @@ class NumberingStyle(_NumberingStyle):
 	
 	:param _NumberingStyle: Incomplete class of NumberingStyle defined in 'styles.py'.
 	"""
+	numbering: Optional[Numbering] = None
+
 	abstract_numbering_parent: Optional[AbstractNumbering] = None
 	abstract_numbering_children: Optional[list[AbstractNumbering]] = None
-
+	
 
 class Level(OoxmlElement):
 	"""_summary_
@@ -109,6 +111,7 @@ class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 			tree.add(f"[bold]Children[/bold]: [{s}]")
 
 		return tree
+
 
 class AbstractNumbering(OoxmlElement):
 	"""_summary_
@@ -293,6 +296,8 @@ class Numbering(OoxmlElement):
 	abstract_numbering: AbstractNumbering
 	overrides: dict[int, LevelOverride] = {}
 
+	styles: Optional[NumberingStyle] = None
+
 	@classmethod
 	def parse(
 		cls, ooxml_numbering: OoxmlElement, abstract_numberings: list[AbstractNumbering], styles: OoxmlStyles
@@ -374,7 +379,7 @@ class Numbering(OoxmlElement):
 
 		return level_overrides
 	
-	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
+	def find_style_level(self, style: ParagraphStyle | NumberingStyle) -> int:
 		"""_summary_
 
 		:param numbering_style: _description_
@@ -382,7 +387,7 @@ class Numbering(OoxmlElement):
 		:return: _description_
 		"""
 		for i, level in self.abstract_numbering.levels.items():
-			if level.style.id == numbering_style.id:
+			if level.style.id == style.id:
 				return i
 			
 		# Assumption: If the indentation level is marked by the style inside the level object,
@@ -406,12 +411,15 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			ooxml_numbering_part=ooxml_numbering_part, styles=styles
 		)
 
-		return cls(
+		ooxml_numberings: OoxmlNumberings = cls(
 			abstract_numberings=abstract_numberings,
 			numberings=cls._parse_numberings(
 				ooxml_numbering_part=ooxml_numbering_part, abstract_numberings=abstract_numberings, styles=styles
 			)
 		)
+		ooxml_numberings.associate_numbering_styles_and_numberings()
+
+		return ooxml_numberings
 	
 	@staticmethod
 	def _parse_abstract_numberings(ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> list[AbstractNumbering]:
@@ -448,6 +456,9 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			Numbering.parse(ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings, styles=styles)
 			for ooxml_numbering in ooxml_numberings
 		]
+	
+	def associate_numbering_styles_and_numberings(self) -> None:
+		pass
 	
 	def find(self, id: int) -> Optional[Numbering]:
 		"""
