@@ -9,6 +9,7 @@ from utils.pydantic import ArbitraryBaseModel
 from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
 
+
 class FontSize(float):
 	@classmethod
 	def default(cls) -> FontSize:
@@ -101,8 +102,10 @@ class ToggleProperty(int):  # Subclass of int, because python will not let me do
 
 		return cls(cls._from_existing_ooxml_val_str(v=v))
 
+
 class Bold(ToggleProperty):
 	pass
+
 
 class Italic(ToggleProperty):
 	pass
@@ -318,7 +321,8 @@ class ParagraphStyleProperties(ArbitraryBaseModel):
 
 
 class TableStyleProperties(ArbitraryBaseModel):
-	todo: str
+	pass
+
 
 class StyleProperties(ArbitraryBaseModel):
 	"""

@@ -10,5 +10,8 @@ from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
 
 
+
+
 class Numbering(ArbitraryBaseModel):
-	pass
+	id: int
+	

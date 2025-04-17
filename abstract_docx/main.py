@@ -6,9 +6,7 @@ from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
-
-
-
+from abstract_docx.normalization.format.numberings import numberings_normalization
 
 class AbstractDocx(ArbitraryBaseModel):
 	"""
@@ -28,4 +26,4 @@ class AbstractDocx(ArbitraryBaseModel):
 if __name__ == "__main__":
 	x = AbstractDocx.read(file_path="test/cp2022_10a01.docx")
 	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
-	print(y.effective_styles)
+	numberings_normalization(ooxml_numberings=x.ooxml_docx.structure.numberings)
