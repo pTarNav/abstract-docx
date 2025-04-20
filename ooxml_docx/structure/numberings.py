@@ -7,8 +7,8 @@ from rich.tree import Tree
 from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
-from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle, Style
+from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, NumberingProperties
+from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle
 
 
 class NumberingStyle(_NumberingStyle):
@@ -21,6 +21,19 @@ class NumberingStyle(_NumberingStyle):
 	abstract_numbering_parent: Optional[AbstractNumbering] = None
 	abstract_numbering_children: Optional[list[AbstractNumbering]] = None
 
+	numbering: Optional[Numbering] = None
+	
+	# @classmethod
+	# def load_from_incomplete(cls, incomplete_numbering_style: _NumberingStyle) -> NumberingStyle:
+	# 	# ! This is the most straightforward solution I have been able to find so far...
+	# 	# The problem is that the NumberingStyle returned by styles.find() is the one defined at styles.py
+	# 	# And it expects the NumberingStyle defined in this script
+	# 	# (which is the complete one to avoid circular dependencies)
+	# 	# Moreover, the .model_dump() cannot be used to unpack correctly the necessary fields
+	# 	return cls(
+	# 		**{k: v for k, v in incomplete_numbering_style.model_dump().items()if k in Style.model_fields},
+	# 		properties=incomplete_numbering_style.properties
+	# 	)
 
 class Level(OoxmlElement):
 	"""_summary_
@@ -91,6 +104,8 @@ class Level(OoxmlElement):
 class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	"""_summary_
 
+	Assumption: Only numbering styles can be associated to abstract numberings
+	 through the <w:numStyleLink> and <w:styleLink> mechanism
 	"""
 	style: Optional[NumberingStyle] = None  # numStyleLink
 	style_children: Optional[list[NumberingStyle]] = None  # styleLink
@@ -109,6 +124,7 @@ class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 			tree.add(f"[bold]Children[/bold]: [{s}]")
 
 		return tree
+
 
 class AbstractNumbering(OoxmlElement):
 	"""_summary_
@@ -176,6 +192,8 @@ class AbstractNumbering(OoxmlElement):
 		style_id: Optional[str] = ooxml_abstract_numbering.xpath_query(query="./w:numStyleLink/@w:val", singleton=True)
 		if style_id is not None:
 			style = styles.find(id=str(style_id), type=OoxmlStyleTypes.NUMBERING)
+			if style is None:
+				raise ValueError("was not able to find style from .find() when it should exist")  # TODO
 
 		style_children_ids: Optional[list[str]] = ooxml_abstract_numbering.xpath_query(query="./w:styleLink/@w:val")
 		if style_children_ids is not None:
@@ -183,15 +201,9 @@ class AbstractNumbering(OoxmlElement):
 			for style_children_id in style_children_ids:
 				style_child: Optional[_NumberingStyle] = styles.find(id=str(style_children_id), type=OoxmlStyleTypes.NUMBERING)
 				if style_child is not None:
-					# ! This is the most straightforward solution I have been able to find so far...
-					# The problem is that the NumberingStyle returned by styles.find() is the one defined at styles.py
-					# And it expects the NumberingStyle defined in this script
-					# (which is the complete one to avoid circular dependencies)
-					# Moreover, the .model_dump() cannot be used to unpack correctly the necessary fields
-					style_children.append(NumberingStyle(
-						**{k: v for k, v in style_child.model_dump().items()if k in Style.model_fields},
-						properties=style_child.properties
-					))
+					style_children.append(style_child)
+				else:
+					raise ValueError("was not able to find style from .find() when it should exist")  # TODO
 		
 		return (
 			AbstractNumberingAssociatedStyles(style=style, style_children=style_children) 
@@ -315,11 +327,11 @@ class Numbering(OoxmlElement):
 			)
 		)
 
+		# TODO: Encapsulate this part into a self function
 		#
 		if numbering.abstract_numbering.numberings is None:
 			numbering.abstract_numbering.numberings = []
 		numbering.abstract_numbering.numberings.append(numbering)
-
 		#
 		for override in numbering.overrides.values():
 			override.numbering = numbering
@@ -374,23 +386,45 @@ class Numbering(OoxmlElement):
 
 		return level_overrides
 	
-	def find_numbering_style_level(self, numbering_style: NumberingStyle) -> int:
+	def find_style_level(self, style: ParagraphStyle | NumberingStyle) -> int:
 		"""_summary_
 
+		Assumption
 		:param numbering_style: _description_
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-		for i, level in self.abstract_numbering.levels.items():
-			if level.style.id == numbering_style.id:
-				return i
-			
-		# Assumption: If the indentation level is marked by the style inside the level object,
-		# only consider the direct abstract numbering, do not go down the chain of style and abstract numbering hierarchy.
+		# Case: Style contains an indentation level marker.
+		if isinstance(style, ParagraphStyle):
+			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:ilvl/@w:val", singleton=True)
+		elif isinstance(style, NumberingStyle):
+			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:ilvl/@w:val", singleton=True)
+		else:
+			raise ValueError("") # TODO
+		
+		if indentation_level is not None:
+			return int(indentation_level)
+
+		# Case: Indentation level is marked by the style inside the level object.
+		# Assumption: Only consider the direct abstract numbering,
+		#  do not go down the chain of style and abstract numbering hierarchy.
 		# ! Might be needed to change in the future if the assumption is not correct...
+		for i, level in self.abstract_numbering.levels.items():
+			if level.style.id == style.id:
+				return i
+		
+		# ! Might be the case that it is assumed that the level to be used is the lowest one available...
 
 		raise ValueError("") # TODO
 
+
+def _reload_incomplete_numbering_styles_into_complete(numbering_styles: list[_NumberingStyle]) -> None:
+	for numbering_style in numbering_styles:
+		numbering_style.__class__ = NumberingStyle
+
+		if numbering_style.children is not None:
+			_reload_incomplete_numbering_styles_into_complete(numbering_styles=numbering_style.children)
+			
 
 class OoxmlNumberings(ArbitraryBaseModel):
 	abstract_numberings: list[AbstractNumbering] = []
@@ -402,17 +436,27 @@ class OoxmlNumberings(ArbitraryBaseModel):
 
 		:return: _description_
 		"""
+		# It is necessary to first reload the numbering styles into the complete class definition
+		_reload_incomplete_numbering_styles_into_complete(numbering_styles=styles.roots.numbering)
+
 		abstract_numberings: list[AbstractNumbering] = cls._parse_abstract_numberings(
 			ooxml_numbering_part=ooxml_numbering_part, styles=styles
 		)
-
-		return cls(
+		
+		ooxml_numberings: OoxmlNumberings = cls(
 			abstract_numberings=abstract_numberings,
 			numberings=cls._parse_numberings(
 				ooxml_numbering_part=ooxml_numbering_part, abstract_numberings=abstract_numberings, styles=styles
 			)
 		)
+
+		#
+		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.paragraph, style_type=OoxmlStyleTypes.PARAGRAPH)
+		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.numbering, style_type=OoxmlStyleTypes.NUMBERING)
+
+		return ooxml_numberings
 	
+
 	@staticmethod
 	def _parse_abstract_numberings(ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> list[AbstractNumbering]:
 		"""_summary_
@@ -448,6 +492,37 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			Numbering.parse(ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings, styles=styles)
 			for ooxml_numbering in ooxml_numberings
 		]
+	
+	def associate_styles_and_numberings(
+			self, styles: list[ParagraphStyle | NumberingStyle], style_type: OoxmlStyleTypes
+		) -> None:
+		for style in styles:
+			if style.properties is not None:
+				match style_type:
+					case OoxmlStyleTypes.PARAGRAPH:
+						numbering_id: Optional[int] = style.properties.xpath_query(
+							query="./w:numPr/w:numId/@w:val", singleton=True
+						)
+					case OoxmlStyleTypes.NUMBERING:
+						numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
+					case _:
+						raise ValueError("WTF are you doing")  # TODO
+				
+				numbering: Optional[Numbering] = self.find(id=int(numbering_id)) if numbering_id is not None else None
+				if numbering is not None:
+					style.numbering = numbering
+				else:
+					# In some cases (because of ooxml manipulation from external programs),
+					#  there is a numbering reference to an inexistent numbering instance.
+					# They are harmless and will be corrected in the abstract_docx normalization step.
+					# Raises a warning instead of an error and proceeds.
+					print(
+						f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
+					)
+
+			if style.children is not None:
+				self.associate_styles_and_numberings(styles=style.children, style_type=style_type)
+
 	
 	def find(self, id: int) -> Optional[Numbering]:
 		"""

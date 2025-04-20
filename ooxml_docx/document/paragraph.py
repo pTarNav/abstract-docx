@@ -165,7 +165,7 @@ class Paragraph(OoxmlElement):
 
 		numbering_parse_result: Optional[tuple[Numbering, int]] = cls._parse_numbering(
 			ooxml_paragraph=ooxml_paragraph,
-			numbering_style=style if isinstance(style, NumberingStyle) else None,  # Only numbering style is relevant
+			style=style,  
 			numberings=numberings
 		)
 
@@ -239,7 +239,7 @@ class Paragraph(OoxmlElement):
 	
 	@staticmethod
 	def _parse_numbering(
-			ooxml_paragraph: OoxmlElement, numbering_style: Optional[NumberingStyle], numberings: OoxmlNumberings
+			ooxml_paragraph: OoxmlElement, style: Optional[NumberingStyle], numberings: OoxmlNumberings
 		) -> Optional[tuple[Numbering, int]]:
 		ooxml_numbering: Optional[NumberingProperties] = ooxml_paragraph.xpath_query(
 			query="./w:pPr/w:numPr", singleton=True
@@ -253,9 +253,9 @@ class Paragraph(OoxmlElement):
 			
 			if numbering is None:
 				# In some cases (because of ooxml manipulation from external programs),
-				# there is a numbering reference to an inexistent numbering instance
-				# They are harmless and will be corrected in the abstract_docx normalization step
-				# Raises a warning instead of an error and proceed
+				#  there is a numbering reference to an inexistent numbering instance.
+				# They are harmless and will be corrected in the abstract_docx normalization step.
+				# Raises a warning instead of an error and proceeds.
 				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=}\033[0m")
 				return None				
 
@@ -267,17 +267,9 @@ class Paragraph(OoxmlElement):
 
 			return numbering, indentation_level
 		
-		# Case: Numbering properties via numbering style
-		if numbering_style is not None:
-			numbering_id: int = int(numbering_style.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
-
-			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
-			if numbering is None:
-				# Same reasoning and procedure as in the previous case above
-				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {numbering_style.id=})\033[0m")
-				return None	
-
-			return numbering, numbering.find_numbering_style_level(numbering_style=numbering_style)
+		# Case: Numbering properties via numbering style or paragraph style
+		if style is not None and style.numbering is not None:
+			return style.numbering, style.numbering.find_style_level(style=style)
 
 		return None
 
