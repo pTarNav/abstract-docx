@@ -437,7 +437,8 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		)
 
 		#
-		ooxml_numberings.associate_styles_and_numberings(numbering_styles=styles.roots.numbering)
+		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.paragraph, style_type=OoxmlStyleTypes.PARAGRAPH)
+		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.numbering, style_type=OoxmlStyleTypes.NUMBERING)
 
 		return ooxml_numberings
 	
@@ -478,26 +479,35 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			for ooxml_numbering in ooxml_numberings
 		]
 	
-	def associate_styles_and_numberings(self, numbering_styles: list[NumberingStyle]) -> None:
-		for numbering_style in numbering_styles:
-			if numbering_style.properties is not None:
-				numbering_id: int = int(
-					numbering_style.properties.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True)
-				)
-				numbering: Optional[Numbering] = self.find(id=numbering_id)
+	def associate_styles_and_numberings(
+			self, styles: list[NumberingStyle | ParagraphStyle], style_type: OoxmlStyleTypes
+		) -> None:
+		for style in styles:
+			if style.properties is not None:
+				match style_type:
+					case OoxmlStyleTypes.PARAGRAPH:
+						numbering_id: Optional[int] = style.properties.xpath_query(
+							query="./w:numPr/w:numId/@w:val", singleton=True
+						)
+					case OoxmlStyleTypes.NUMBERING:
+						numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
+					case _:
+						raise ValueError("WTF are you doing")  # TODO
+				
+				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
 				if numbering is not None:
-					numbering_style.numbering = numbering
+					style.numbering = numbering
 				else:
 					# In some cases (because of ooxml manipulation from external programs),
 					#  there is a numbering reference to an inexistent numbering instance.
 					# They are harmless and will be corrected in the abstract_docx normalization step.
 					# Raises a warning instead of an error and proceeds.
 					print(
-						f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {numbering_style.id=})\033[0m"
-				)
+						f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
+					)
 
-			if numbering_style.children is not None:
-				self.associate_styles_and_numberings(numbering_styles=numbering_style.children)
+			if style.children is not None:
+				self.associate_styles_and_numberings(styles=style.children, style_type=style_type)
 
 	
 	def find(self, id: int) -> Optional[Numbering]:
