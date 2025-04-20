@@ -7,8 +7,8 @@ from rich.tree import Tree
 from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
-from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle, Style
+from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, NumberingProperties
+from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle
 
 
 class NumberingStyle(_NumberingStyle):
@@ -389,17 +389,31 @@ class Numbering(OoxmlElement):
 	def find_style_level(self, style: ParagraphStyle | NumberingStyle) -> int:
 		"""_summary_
 
+		Assumption
 		:param numbering_style: _description_
 		:raises ValueError: _description_
 		:return: _description_
 		"""
+		# Case: Style contains an indentation level marker.
+		if isinstance(style, ParagraphStyle):
+			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:ilvl/@w:val", singleton=True)
+		elif isinstance(style, NumberingStyle):
+			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:ilvl/@w:val", singleton=True)
+		else:
+			raise ValueError("") # TODO
+		
+		if indentation_level is not None:
+			return int(indentation_level)
+
+		# Case: Indentation level is marked by the style inside the level object.
+		# Assumption: Only consider the direct abstract numbering,
+		#  do not go down the chain of style and abstract numbering hierarchy.
+		# ! Might be needed to change in the future if the assumption is not correct...
 		for i, level in self.abstract_numbering.levels.items():
 			if level.style.id == style.id:
 				return i
-			
-		# Assumption: If the indentation level is marked by the style inside the level object,
-		# only consider the direct abstract numbering, do not go down the chain of style and abstract numbering hierarchy.
-		# ! Might be needed to change in the future if the assumption is not correct...
+		
+		# ! Might be the case that it is assumed that the level to be used is the lowest one available...
 
 		raise ValueError("") # TODO
 
@@ -480,7 +494,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		]
 	
 	def associate_styles_and_numberings(
-			self, styles: list[NumberingStyle | ParagraphStyle], style_type: OoxmlStyleTypes
+			self, styles: list[ParagraphStyle | NumberingStyle], style_type: OoxmlStyleTypes
 		) -> None:
 		for style in styles:
 			if style.properties is not None:
@@ -494,7 +508,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 					case _:
 						raise ValueError("WTF are you doing")  # TODO
 				
-				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
+				numbering: Optional[Numbering] = self.find(id=int(numbering_id)) if numbering_id is not None else None
 				if numbering is not None:
 					style.numbering = numbering
 				else:

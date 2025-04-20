@@ -268,27 +268,8 @@ class Paragraph(OoxmlElement):
 			return numbering, indentation_level
 		
 		# Case: Numbering properties via numbering style or paragraph style
-		if style is not None and style.properties is not None:
-			if isinstance(style, NumberingStyle):		
-				numbering_id: int = int(style.properties.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
-			elif isinstance(style, ParagraphStyle):
-				numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:numId/@w:val", singleton=True)
-				if numbering_id is None:
-					# Case where a paragraph style is found, but not a reference to a numbering inside it
-					return None
-				numbering_id: int = int(numbering_id)
-			else:
-				raise ValueError() # TODO
-			
-			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
-			if numbering is None:
-				# Same reasoning and procedure as in the previous case above
-				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m")
-				return None	
-
-			# TODO: parse indentation level from style
-
-			return numbering, numbering.find_style_level(style=style)
+		if style is not None and style.numbering is not None:
+			return style.numbering, style.numbering.find_style_level(style=style)
 
 		return None
 
