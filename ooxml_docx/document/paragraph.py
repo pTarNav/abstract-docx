@@ -253,9 +253,9 @@ class Paragraph(OoxmlElement):
 			
 			if numbering is None:
 				# In some cases (because of ooxml manipulation from external programs),
-				# there is a numbering reference to an inexistent numbering instance
-				# They are harmless and will be corrected in the abstract_docx normalization step
-				# Raises a warning instead of an error and proceed
+				#  there is a numbering reference to an inexistent numbering instance.
+				# They are harmless and will be corrected in the abstract_docx normalization step.
+				# Raises a warning instead of an error and proceeds.
 				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=}\033[0m")
 				return None				
 
@@ -268,14 +268,17 @@ class Paragraph(OoxmlElement):
 			return numbering, indentation_level
 		
 		# Case: Numbering properties via numbering style or paragraph style
-		if style is not None:
-			match type(style):
-				case OoxmlStyleTypes.NUMBERING:
-					numbering_id: int = int(style.properties.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
-				case OoxmlStyleTypes.PARAGRAPH:
-					numbering_id: int = int(style.properties.xpath_query(query="./w:numPr/w:numId/@w:val", nullable=False, singleton=True))
-				case _:
-					raise ValueError() # TODO
+		if style is not None and style.properties is not None:
+			if isinstance(style, NumberingStyle):		
+				numbering_id: int = int(style.properties.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
+			elif isinstance(style, ParagraphStyle):
+				numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:numId/@w:val", singleton=True)
+				if numbering_id is None:
+					# Case where a paragraph style is found, but not a reference to a numbering inside it
+					return None
+				numbering_id: int = int(numbering_id)
+			else:
+				raise ValueError() # TODO
 			
 			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
 			if numbering is None:
