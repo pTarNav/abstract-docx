@@ -402,13 +402,13 @@ class Numbering(OoxmlElement):
 		raise ValueError("") # TODO
 
 
-def reload_incomplete_numbering_style_into_complete(numbering_style: _NumberingStyle):
-	numbering_style.__class__ = NumberingStyle
+def _reload_incomplete_numbering_styles_into_complete(numbering_styles: list[_NumberingStyle]) -> None:
+	for numbering_style in numbering_styles:
+		numbering_style.__class__ = NumberingStyle
 
-	if numbering_style.children is not None:
-		for child in numbering_style.children:
-			reload_incomplete_numbering_style_into_complete(numbering_style=child)
-
+		if numbering_style.children is not None:
+			_reload_incomplete_numbering_styles_into_complete(numbering_styles=numbering_style.children)
+			
 
 class OoxmlNumberings(ArbitraryBaseModel):
 	abstract_numberings: list[AbstractNumbering] = []
@@ -421,8 +421,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		:return: _description_
 		"""
 		# It is necessary to first reload the numbering styles into the complete class definition
-		for numbering_style in styles.roots.numbering:
-			reload_incomplete_numbering_style_into_complete(numbering_style=numbering_style)
+		_reload_incomplete_numbering_styles_into_complete(numbering_styles=styles.roots.numbering)
 
 		abstract_numberings: list[AbstractNumbering] = cls._parse_abstract_numberings(
 			ooxml_numbering_part=ooxml_numbering_part, styles=styles
@@ -438,6 +437,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		ooxml_numberings.associate_styles_and_numberings(numbering_styles=styles.roots.numbering)
 
 		return ooxml_numberings
+	
 
 	@staticmethod
 	def _parse_abstract_numberings(ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> list[AbstractNumbering]:
