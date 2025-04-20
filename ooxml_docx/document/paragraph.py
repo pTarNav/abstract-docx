@@ -286,6 +286,8 @@ class Paragraph(OoxmlElement):
 				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m")
 				return None	
 
+			# TODO: parse indentation level from style
+
 			return numbering, numbering.find_style_level(style=style)
 
 		return None

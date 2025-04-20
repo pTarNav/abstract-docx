@@ -104,6 +104,8 @@ class Level(OoxmlElement):
 class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	"""_summary_
 
+	Assumption: Only numbering styles can be associated to abstract numberings
+	 through the <w:numStyleLink> and <w:styleLink> mechanism
 	"""
 	style: Optional[NumberingStyle] = None  # numStyleLink
 	style_children: Optional[list[NumberingStyle]] = None  # styleLink
@@ -434,6 +436,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			)
 		)
 
+		#
 		ooxml_numberings.associate_styles_and_numberings(numbering_styles=styles.roots.numbering)
 
 		return ooxml_numberings

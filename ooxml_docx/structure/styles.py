@@ -17,7 +17,6 @@ from ooxml_docx.structure.properties import (
 	NumberingProperties
 )
 
-
 class Style(OoxmlElement):
 	"""
 	Representation of an OOXML style element.
@@ -135,7 +134,8 @@ class ParagraphStyle(Style):
 	next_paragraph_style: Optional[ParagraphStyle] = None
 	# (for easier access thanks to the .find() method)
 	linked_run_style: Optional[RunStyle] = None  # Assumption: Only one run style can be linked
-	
+
+	numbering: Optional["Numbering"] = None  # To avoid circular import hell
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> ParagraphStyle:
