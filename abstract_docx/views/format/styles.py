@@ -37,13 +37,13 @@ class FontScript(Enum):
 	"""
 	Defaults to normal
 	"""
-	normal = "NORMAL"
-	superscript = "SUPERSCRIPT"
-	subscript = "SUBSCRIPT"
+	NORMAL = "normal"
+	SUPERSCRIPT = "superscript"
+	SUBSCRIPT = "subscript"
 
 	@classmethod
 	def default(cls) -> FontScript:
-		return cls.normal
+		return cls.NORMAL
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontScript]:
@@ -54,9 +54,9 @@ class FontScript(Enum):
 			return None
 		
 		return {
-			"baseline": cls.normal,
-			"superscript": cls.superscript,
-			"subscript": cls.subscript,
+			"baseline": cls.NORMAL,
+			"superscript": cls.SUPERSCRIPT,
+			"subscript": cls.SUBSCRIPT,
 		}.get(v, cls.default())
 
 
@@ -193,14 +193,14 @@ class Justification(Enum):
 	"""
 	Defaults to start.
 	"""
-	start = "START"			# |The quick brown fox.                |
-	center = "CENTER"		# |        The quick brown fox.        |
-	end = "END"				# |                The quick brown fox.|
-	justified = "JUSTIFIED"	# |The      quick       brown      fox.|
+	START = "start"			# |The quick brown fox.                |
+	CENTER = "center"		# |        The quick brown fox.        |
+	END = "end"				# |                The quick brown fox.|
+	JUSTIFIED = "justified"	# |The      quick       brown      fox.|
 
 	@classmethod
 	def default(cls) -> Justification:
-		return cls.start
+		return cls.START
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[Justification]:
@@ -211,13 +211,13 @@ class Justification(Enum):
 			return None
 
 		return {
-			"start": cls.start,
-			"left": cls.start,
-			"end": cls.end,
-			"right": cls.end,
-			"center": cls.center,
-			"both": cls.justified,
-			"distribute": cls.justified  # Even though it is supposed to be it's own type...
+			"start": cls.START,
+			"left": cls.START,
+			"end": cls.END,
+			"right": cls.END,
+			"center": cls.CENTER,
+			"both": cls.JUSTIFIED,
+			"distribute": cls.JUSTIFIED  # Even though it is supposed to be it's own type...
 		}.get(v, cls.default())
 
 
