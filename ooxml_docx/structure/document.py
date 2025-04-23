@@ -62,7 +62,7 @@ class OoxmlDocument(OoxmlElement):
 			# because it allows the user to parse the other kinds of docx data through this tool
 			# "E.g. User wants to check and normalize the style hierarchy"
 			# Raises a warning instead of an error and proceed
-			print("\033[33mWarning: No textual content detected inside the document...\033[0m")
+			print("\033[33m[Warning] No textual content detected inside the document...\033[0m")
 			return []
 
 		content: list[Paragraph | Table] = []

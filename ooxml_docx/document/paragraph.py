@@ -256,7 +256,7 @@ class Paragraph(OoxmlElement):
 				#  there is a numbering reference to an inexistent numbering instance.
 				# They are harmless and will be corrected in the abstract_docx normalization step.
 				# Raises a warning instead of an error and proceeds.
-				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=}\033[0m")
+				print(f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=}\033[0m")
 				return None				
 
 			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)

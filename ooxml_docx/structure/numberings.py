@@ -250,7 +250,6 @@ class LevelOverride(OoxmlElement):
 	"""
 	id: int
 	level: Optional[Level] = None
-	start: Optional[int] = None
 
 	# Note that numbering and overridden level are optional in order to facilitate the construction
 	# however, they should not be empty and always associated to a numbering instance and the respective overridden level.
@@ -265,13 +264,11 @@ class LevelOverride(OoxmlElement):
 		:return: _description_
 		"""
 		id: int = int(ooxml_level_override.xpath_query(query="./@w:ilvl", nullable=False, singleton=True))
-		start: Optional[int] = ooxml_level_override.xpath_query(query="./w:startOverride/@w:val", singleton=True)
 
 		return cls(
 			element=ooxml_level_override.element,
 			id=id,
-			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id),
-			start=int(start) if start is not None else None
+			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id)
 		)
 
 	@staticmethod
@@ -381,7 +378,11 @@ class Numbering(OoxmlElement):
 		level_overrides: dict[int, LevelOverride] = {}
 		for ooxml_level_override in ooxml_level_overrides:
 			level_override: LevelOverride = LevelOverride.parse(ooxml_level_override=ooxml_level_override, styles=styles)
-			level_override.overridden_level = abstract_numbering.levels[level_override.id]  # Associate overridden level
+			
+			# Associate overridden level (if level exists in abstract numbering)
+			if level_override.id in abstract_numbering.levels.keys():
+				level_override.overridden_level = abstract_numbering.levels[level_override.id]
+
 			level_overrides[level_override.id] = level_override
 
 		return level_overrides
@@ -413,14 +414,20 @@ class Numbering(OoxmlElement):
 			if level.style.id == style.id:
 				return i
 		
-		# ! Might be the case that it is assumed that the level to be used is the lowest one available...
-
-		raise ValueError("") # TODO
+		# In some cases (because of ooxml manipulation from external programs),	
+		#  it might be assumed that the level to be used is the lowest one available.
+		# Raise a warning to log that this assumption has been made.
+		print(f"\033[33m[Warning] Lowest indentation level assumption made for: {style.id=}\033[0m")
+		return 0
 
 
 def _reload_incomplete_numbering_styles_into_complete(numbering_styles: list[_NumberingStyle]) -> None:
 	for numbering_style in numbering_styles:
+		# Monkey patching
 		numbering_style.__class__ = NumberingStyle
+		numbering_style.abstract_numbering_parent = None
+		numbering_style.abstract_numbering_children = None
+		numbering_style.numbering = None
 
 		if numbering_style.children is not None:
 			_reload_incomplete_numbering_styles_into_complete(numbering_styles=numbering_style.children)
@@ -511,13 +518,13 @@ class OoxmlNumberings(ArbitraryBaseModel):
 				numbering: Optional[Numbering] = self.find(id=int(numbering_id)) if numbering_id is not None else None
 				if numbering is not None:
 					style.numbering = numbering
-				else:
+				elif numbering_id is not None:
 					# In some cases (because of ooxml manipulation from external programs),
 					#  there is a numbering reference to an inexistent numbering instance.
 					# They are harmless and will be corrected in the abstract_docx normalization step.
 					# Raises a warning instead of an error and proceeds.
 					print(
-						f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
+						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
 					)
 
 			if style.children is not None:
