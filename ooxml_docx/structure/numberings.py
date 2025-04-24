@@ -44,7 +44,7 @@ class Level(OoxmlElement):
 	# however, it should not be empty and always associated to an abstract numbering definition.
 	abstract_numbering: Optional[AbstractNumbering] = None
 
-	properties: Optional[list[OoxmlElement]] = None
+	properties: Optional[list[OoxmlElement]] = None  # TODO, this is actually never used because it doesnt have the commodity of xpath_query
 	run_properties: Optional[RunProperties] = None
 	paragraph_properties: Optional[ParagraphProperties] = None
 	

@@ -8,13 +8,16 @@ from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
+import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
+
 
 from abstract_docx.views.format.styles import RunStyleProperties, ParagraphStyleProperties
+
 
 class MarkerPattern(str):
 
 	@classmethod
-	def default(cls) -> MarkerType:
+	def default(cls) -> MarkerPattern:
 		return cls("")  # TODO: investigate further
 
 	@classmethod
@@ -25,8 +28,7 @@ class MarkerPattern(str):
 			
 			return cls.default()
 		
-		return ""	# TODO: parse %d with regex and prepare accordingly
-
+		return cls("")	# TODO: parse %d with regex and prepare accordingly
 		
 
 class MarkerType(Enum):
@@ -126,25 +128,108 @@ class Restart(int):
 		return cls(int(v))
 
 
-class LevelProperties(ArbitraryBaseModel):
+class LevelStyleProperties(ArbitraryBaseModel):
 	marker_pattern: Optional[MarkerPattern] = None
-	market_type: Optional[MarkerType] = None
+	marker_type: Optional[MarkerType] = None
 	whitespace: Optional[Whitespace] = None
 	start: Optional[Start] = None
 	restart: Optional[Restart] = None
 
+	@classmethod
+	def default(cls) -> LevelStyleProperties:
+		return cls(
+			marker_patter=MarkerPattern.default(),
+			marker_type=MarkerType.default(),
+			whitespace=Whitespace.default(),
+			start=Start.default(),
+			restart=Restart.default()
+		)
 
-class Level(ArbitraryBaseModel):
-	level_properties: LevelProperties
+	@classmethod
+	def from_ooxml(cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False) -> LevelStyleProperties:
+		# TODO: change level with level properties once we figure a way to make level properties easier to access
+		if level is not None:
+			return cls(
+				marker_pattern=MarkerPattern.from_ooxml_val(
+					v=level.xpath_query("./w:lvlText/@w:val", singleton=True), must_default=must_default
+				),
+				marker_type=MarkerType.from_ooxml_val(
+					v=level.xpath_query("./w:numFmt/@w:val", singleton=True), must_default=must_default
+				),
+				whitespace=Whitespace.from_ooxml_val(
+					v=level.xpath_query("./w:suff/@w:val", singleton=True), must_default=must_default
+				),
+				start=Start.from_ooxml_val(
+					v=level.xpath_query("./w:start/@w:val", singleton=True), must_default=must_default
+				),
+				restart=Restart.from_ooxml_val(
+					v=level.xpath_query("./w:lvlRestart/@w:val", singleton=True), must_default=must_default
+				)
+			)
+
+		if must_default:
+			return cls.default()
+		
+		return cls()
+
+	@classmethod
+	def aggregate_ooxml(cls, agg: LevelStyleProperties, add: LevelStyleProperties) -> LevelProperties:
+		return cls.default()  # TODO
+
+
+class LevelProperties(ArbitraryBaseModel):
+	level_style_properties: LevelStyleProperties
 
 	run_style_properties: RunStyleProperties
 	paragraph_style_properties: ParagraphStyleProperties
+
+	@classmethod
+	def default(cls) -> LevelProperties:
+		return cls(
+			level_style_properties=LevelStyleProperties.default(),
+			run_style_properties=RunStyleProperties.default(),
+			paragraph_style_properties=ParagraphStyleProperties.default()
+		)
+
+	@classmethod
+	def from_ooxml(
+		cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False
+	) -> LevelProperties:
+		if level is not None:
+			return cls(
+				level_style_properties=LevelStyleProperties.from_ooxml(level=level, must_default=must_default),
+				run_style_properties=RunStyleProperties.from_ooxml(
+					run_properties=level.run_properties, must_default=must_default
+				),
+				paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
+					paragraph_properties=level.paragraph_properties, must_default=must_default
+				)
+			)
+
+		if must_default:
+			return cls.default()
+		
+		return cls()
+	
+	@classmethod
+	def aggregate_ooxml(cls, agg: LevelProperties, add: LevelProperties, default: LevelProperties) -> LevelProperties:
+		return cls(
+			level_style_properties=LevelStyleProperties.aggregate_ooxml(
+				agg=agg.level_style_properties, add=add.level_style_properties
+			),
+			run_style_properties=RunStyleProperties.aggregate_ooxml(
+				agg=agg.run_style_properties, add=add.run_style_properties, default=default.run_style_properties
+			),
+			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
+				agg=agg.paragraph_style_properties, add=add.paragraph_style_properties
+			)
+		)
 
 
 class Numbering(ArbitraryBaseModel):
 	id: int
 
-	levels: dict[int, Level]
+	levels: dict[int, LevelStyleProperties]
 
 	parent: Optional[Numbering] = None
 	children: Optional[list[Numbering]] = None

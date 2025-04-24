@@ -7,6 +7,8 @@ from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.views.format.numberings import Numbering
 
+from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
+
 from ooxml_docx.structure.numberings import OoxmlNumberings, AbstractNumbering, NumberingStyle
 
 
@@ -20,15 +22,19 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	ooxml_numberings: OoxmlNumberings
 	effective_numberings: dict[int, Numbering]
 
+	effective_styles: EffectiveStylesFromOoxml
+
 	# Auxiliary data for intermediate steps
 	_effective_discovered_abstract_numberings: dict[int, Numbering] = {}
 	_effective_discovered_numbering_styles: dict[str, Numbering] = {}
 
 	@classmethod
-	def normalization(cls, ooxml_numberings: OoxmlNumberings) -> EffectiveNumberingsFromOoxml:
+	def normalization(
+			cls, ooxml_numberings: OoxmlNumberings, effective_styles: EffectiveStylesFromOoxml
+		) -> EffectiveNumberingsFromOoxml:
 		
 		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml = cls(
-			ooxml_numberings=ooxml_numberings, effective_numberings={}
+			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles=effective_styles
 		)
 		effective_numberings_from_ooxml.load_effective_numberings()
 
