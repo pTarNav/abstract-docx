@@ -24,6 +24,7 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 	
 if __name__ == "__main__":
-	x = AbstractDocx.read(file_path="test/A6.4-PROC-ACCR-002.docx")
+	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report"]
+	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
 	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
 	numberings_normalization(ooxml_numberings=x.ooxml_docx.structure.numberings)

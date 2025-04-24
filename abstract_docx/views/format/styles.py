@@ -234,7 +234,7 @@ class IndentationValue(float):
 			
 			return cls.default()
 
-		return IndentationValue(float(v))
+		return cls(float(v))
 
 
 class Indentation(ArbitraryBaseModel):

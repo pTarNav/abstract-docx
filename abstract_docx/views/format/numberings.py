@@ -90,11 +90,40 @@ class Whitespace(Enum):
 
 
 class Start(int):
-	pass
+	@classmethod
+	def default(cls) -> Start:
+		return cls(1)
+
+	@classmethod
+	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[Start]:
+		if v is None:
+			if not must_default:
+				return None
+			
+			return cls.default()
+		
+		return cls(int(v))
 
 
 class Restart(int):
-	pass
+	"""
+	Special conditions:
+	 - 0: Never restarts.
+	 - -1: Restarts with a new instance of the previous level.
+	"""
+	@classmethod
+	def default(cls) -> Restart:
+		return cls(-1)
+
+	@classmethod
+	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[Restart]:
+		if v is None:
+			if not must_default:
+				return None
+			
+			return cls.default()
+		
+		return cls(int(v))
 
 
 class LevelProperties(ArbitraryBaseModel):
@@ -105,7 +134,7 @@ class LevelProperties(ArbitraryBaseModel):
 	restart: Optional[Restart] = None
 
 
-class NumberingProperties(ArbitraryBaseModel):
+class Level(ArbitraryBaseModel):
 	level_properties: LevelProperties
 
 	run_style_properties: RunStyleProperties
@@ -115,9 +144,10 @@ class NumberingProperties(ArbitraryBaseModel):
 class Numbering(ArbitraryBaseModel):
 	id: int
 
+	levels: dict[int, Level]
+
 	parent: Optional[Numbering] = None
 	children: Optional[list[Numbering]] = None
 	
-	properties: NumberingProperties
 
 	
