@@ -28,3 +28,9 @@ if __name__ == "__main__":
 	x = AbstractDocx.read(file_path=f"test/{test_files[1]}.docx")
 	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
 	z = EffectiveNumberingsFromOoxml.normalization(ooxml_numberings=x.ooxml_docx.structure.numberings, effective_styles=y)
+
+	for k, v in z.effective_numberings.items():
+		print("#"*21, k, "#"*21)
+		for lk, lv in v.levels.items():
+			print("=>", lk)
+			print(lv)

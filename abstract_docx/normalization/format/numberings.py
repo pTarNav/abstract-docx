@@ -43,10 +43,30 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def _check_discovered(id: int | str, effective_discovered_numberings: dict[int | str, Numbering]) -> Optional[Numbering]:
 		return effective_discovered_numberings.get(id, None)
 	
+		
+	def aggregate_effective_numberings(self, agg_numbering: Numbering, add_numbering: Numbering) -> Numbering:
+		return Numbering(
+			id=add_numbering.id,
+			levels={
+				i: LevelProperties.aggregate_ooxml(
+					agg=agg_numbering.levels.get(i, None),
+					add=add_numbering.levels.get(i, None),
+					default_style=self.effective_styles.effective_styles["__DocDefaults__"]
+				)
+				for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys()))
+			}
+		)
+	
 	def merge_into_effective_numbering_style(
 			self, effective_numbering: Optional[Numbering], effective_abstract_numbering: Optional[Numbering]
 		) -> Optional[Numbering]:
-			return None
+			if effective_numbering is None and effective_abstract_numbering is None:
+				return None
+			
+			# Assumption: The merge can actually be treated the same as aggregation
+			return self.aggregate_effective_numberings(
+				agg_numbering=effective_abstract_numbering, add_numbering=effective_numbering
+			)
 
 	def _compute_effective_numbering_style(
 			self,
@@ -108,19 +128,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		self._discovered_effective_numbering_styles[merged_effective_numbering_style.id] = merged_effective_numbering_style
 
 		return merged_effective_numbering_style
-	
-	def aggregate_effective_numberings(self, agg_numbering: Numbering, add_numbering: Numbering) -> Numbering:
-		return Numbering(
-			id=add_numbering.id,
-			levels={
-				i: LevelProperties.aggregate_ooxml(
-					agg=agg_numbering.levels.get(i, None),
-					add=add_numbering.levels.get(i, None),
-					default_style=self.effective_styles.effective_styles["__DocDefaults__"]
-				)
-				for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys()))
-			}
-		)
 
 	def compute_effective_numbering(
 			self,

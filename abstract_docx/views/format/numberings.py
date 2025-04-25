@@ -6,8 +6,6 @@ from colour import Color
 
 from utils.pydantic import ArbitraryBaseModel
 
-from ooxml_docx.ooxml import OoxmlElement
-import ooxml_docx.structure.properties as OOXML_PROPERTIES
 import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
 
 
@@ -176,13 +174,22 @@ class LevelStyleProperties(ArbitraryBaseModel):
 	def aggregate_ooxml(cls, agg: Optional[LevelStyleProperties], add: Optional[LevelStyleProperties]) -> LevelProperties:
 		match agg is not None, add is not None:
 			case True, True:
-				return cls.default()
+				return cls(
+					marker_patter=add.marker_pattern if add.marker_pattern is not None else agg.marker_pattern,
+					marker_type=add.marker_type if add.marker_type is not None else agg.marker_type,
+					whitespace=add.whitespace if add.whitespace is not None else agg.whitespace,
+					start=add.start if add.start is not None else agg.start,
+					restart=add.restart if add.restart is not None else agg.restart
+				)
 			case True, False:
 				return agg
 			case False, True:
 				return add
-			case False, False:
-				return cls.default() # TODO
+			case _:
+				# At least one of the level style properties will never be empty.
+				# Because it would mean that it is trying to aggregate a level that neither of the numberings have.
+				# If this happens something has terribly gone wrong.
+				raise ValueError("")
 
 
 class LevelProperties(ArbitraryBaseModel):
