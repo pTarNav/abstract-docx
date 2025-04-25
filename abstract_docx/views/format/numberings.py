@@ -11,7 +11,7 @@ import ooxml_docx.structure.properties as OOXML_PROPERTIES
 import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
 
 
-from abstract_docx.views.format.styles import RunStyleProperties, ParagraphStyleProperties
+from abstract_docx.views.format.styles import Style, RunStyleProperties, ParagraphStyleProperties
 
 
 class MarkerPattern(str):
@@ -173,8 +173,16 @@ class LevelStyleProperties(ArbitraryBaseModel):
 		return cls()
 
 	@classmethod
-	def aggregate_ooxml(cls, agg: LevelStyleProperties, add: LevelStyleProperties) -> LevelProperties:
-		return cls.default()  # TODO
+	def aggregate_ooxml(cls, agg: Optional[LevelStyleProperties], add: Optional[LevelStyleProperties]) -> LevelProperties:
+		match agg is not None, add is not None:
+			case True, True:
+				return cls.default()
+			case True, False:
+				return agg
+			case False, True:
+				return add
+			case False, False:
+				return cls.default() # TODO
 
 
 class LevelProperties(ArbitraryBaseModel):
@@ -212,16 +220,20 @@ class LevelProperties(ArbitraryBaseModel):
 		return cls()
 	
 	@classmethod
-	def aggregate_ooxml(cls, agg: LevelProperties, add: LevelProperties, default: LevelProperties) -> LevelProperties:
+	def aggregate_ooxml(cls, agg: Optional[LevelProperties], add: Optional[LevelProperties], default_style: Style) -> LevelProperties:
 		return cls(
 			level_style_properties=LevelStyleProperties.aggregate_ooxml(
-				agg=agg.level_style_properties, add=add.level_style_properties
+				agg=agg.level_style_properties if agg is not None else None,
+				add=add.level_style_properties if add is not None else None
 			),
 			run_style_properties=RunStyleProperties.aggregate_ooxml(
-				agg=agg.run_style_properties, add=add.run_style_properties, default=default.run_style_properties
+				agg=agg.run_style_properties if agg is not None else default_style.properties.run_style_properties,
+				add=add.run_style_properties if add is not None else default_style.properties.run_style_properties,
+				default=default_style.properties.run_style_properties
 			),
 			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
-				agg=agg.paragraph_style_properties, add=add.paragraph_style_properties
+				agg=agg.paragraph_style_properties if agg is not None else default_style.properties.paragraph_style_properties,
+				add=add.paragraph_style_properties if add is not None else default_style.properties.paragraph_style_properties,
 			)
 		)
 
@@ -229,10 +241,7 @@ class LevelProperties(ArbitraryBaseModel):
 class Numbering(ArbitraryBaseModel):
 	id: int
 
-	levels: dict[int, LevelStyleProperties]
+	levels: dict[int, LevelProperties]
 
 	parent: Optional[Numbering] = None
 	children: Optional[list[Numbering]] = None
-	
-
-	
