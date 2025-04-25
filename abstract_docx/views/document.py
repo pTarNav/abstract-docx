@@ -21,3 +21,4 @@ class Block(ArbitraryBaseModel):
 
 class Paragraph(Block):
 	text: list[Text]
+	

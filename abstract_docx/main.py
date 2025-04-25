@@ -1,12 +1,14 @@
 from __future__ import annotations
 from typing import Optional
 import copy
+from itertools import combinations
 
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
+from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
 
 class AbstractDocx(ArbitraryBaseModel):
 	"""
@@ -29,8 +31,4 @@ if __name__ == "__main__":
 	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
 	z = EffectiveNumberingsFromOoxml.normalization(ooxml_numberings=x.ooxml_docx.structure.numberings, effective_styles=y)
 
-	for k, v in z.effective_numberings.items():
-		print("#"*21, k, "#"*21)
-		for lk, lv in v.levels.items():
-			print("=>", lk)
-			print(lv)
+	print(y.effective_styles.keys())

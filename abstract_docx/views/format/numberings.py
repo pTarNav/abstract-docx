@@ -26,7 +26,7 @@ class MarkerPattern(str):
 			
 			return cls.default()
 		
-		return cls("")	# TODO: parse %d with regex and prepare accordingly
+		return cls("{0}, {2}")	# TODO: parse %d with regex and prepare accordingly
 		
 
 class MarkerType(Enum):
@@ -67,6 +67,7 @@ class MarkerType(Enum):
 			"upperRoman": cls.UPPER_ROMAN
 		}.get(v, cls.default())
 
+	# TODO: get/format method
 
 class Whitespace(Enum):
 	NONE = "none"

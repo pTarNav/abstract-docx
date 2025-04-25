@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 
 from ooxml_docx.structure.styles import OoxmlStyles
 import ooxml_docx.structure.styles as OOXML_STYLES
@@ -20,6 +21,7 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 	ooxml_styles: OoxmlStyles
 	effective_styles: dict[str, Style]
 	map_ooxml_to_effective_merged_styles: dict[str, str] = {}
+	map_effective_to_effective_deduplicated_styles: dict[str, str] = {}
 
 	# Auxiliary data for intermediate steps
 	_effective_paragraph_styles: dict[str, Style] = {}
@@ -42,7 +44,10 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 		effective_styles_from_ooxml: EffectiveStylesFromOoxml = cls(
 			ooxml_styles=ooxml_styles, effective_styles={effective_default_style.id: effective_default_style}
 		)
-		effective_styles_from_ooxml.load_effective_styles()
+		effective_styles_from_ooxml.load()
+		print(len(effective_styles_from_ooxml.effective_styles.keys()))
+		effective_styles_from_ooxml.deduplicate()
+		print(len(effective_styles_from_ooxml.effective_styles.keys()))
 
 		return effective_styles_from_ooxml
 	
@@ -120,7 +125,7 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 				effective_run_style: Style = self._effective_run_styles[ooxml_paragraph_style.linked_run_style.id]
 				
 				# Essentially the run style run properties override the paragraph style run properties
-				effective_merged_style_id: str = f"{effective_paragraph_style.id}-{effective_run_style.id}" # TODO: what happens if for some reason there already exists a style with this id?
+				effective_merged_style_id: str = f"{effective_paragraph_style.id}+{effective_run_style.id}" # TODO: what happens if for some reason there already exists a style with this id?
 				self.effective_styles[effective_merged_style_id] = Style(
 					id=effective_merged_style_id, 
 					properties=StyleProperties(
@@ -143,9 +148,41 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 			if effective_run_style_id not in skips:
 				self.effective_styles[effective_run_style_id] = effective_run_style
 
-	def load_effective_styles(self) -> None:
+	def load(self) -> None:
 		"""
 		"""
 		folded_paragraph_styles: list[OOXML_STYLES.ParagraphStyle] = self._compute_effective_paragraph_and_run_styles()
 		self._merge_linked_effective_paragraph_and_run_styles(folded_paragraph_styles=folded_paragraph_styles)
 		self._compile_remaining_effective_run_styles()
+
+	def deduplicate(self) -> None:
+		groups: dict[str, Style] = {}
+		_map_effective_to_effective_deduplicated_styles: dict[str, list[str]] = {}
+		for style in self.effective_styles.values():
+			duplicated_in_group: Optional[str] = None
+			for group_id, grouped_style in groups.items():
+				if style == grouped_style:	
+					duplicated_in_group = group_id
+			
+			if duplicated_in_group is not None:
+				new_group_id = f"{duplicated_in_group}&{style.id}" # TODO: what happens if for some reason there already exists a style with this id?
+				groups[new_group_id] = groups.pop(duplicated_in_group)
+				_map_effective_to_effective_deduplicated_styles[new_group_id] = (
+					_map_effective_to_effective_deduplicated_styles.pop(duplicated_in_group)
+				)
+				_map_effective_to_effective_deduplicated_styles[new_group_id].append(style.id)
+			else:
+				groups[style.id] = style
+				_map_effective_to_effective_deduplicated_styles[style.id] = [style.id]
+
+		self.effective_styles = groups
+		
+		for group_id, style_ids in _map_effective_to_effective_deduplicated_styles.items():
+			for style_id in style_ids:
+				self.map_effective_to_effective_deduplicated_styles[style_id] = group_id
+	
+	def map_from_ooxml_style_id(self, ooxml_style_id: str) -> str:
+		return self.map_effective_to_effective_deduplicated_styles[
+			self.map_ooxml_to_effective_merged_styles.get(ooxml_style_id, ooxml_style_id)
+		]
+					

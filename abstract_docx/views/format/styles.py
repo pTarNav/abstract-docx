@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum
 
 from colour import Color
@@ -382,3 +382,8 @@ class Style(ArbitraryBaseModel):
 	children: Optional[list[Style]] = None
 
 	properties: StyleProperties
+
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Style):
+			return self.properties == v.properties
+		return None

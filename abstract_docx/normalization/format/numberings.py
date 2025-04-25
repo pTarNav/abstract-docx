@@ -20,7 +20,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	ooxml_numberings: OoxmlNumberings
 	effective_numberings: dict[int, Numbering]
 
-	effective_styles: EffectiveStylesFromOoxml
+	effective_styles_from_ooxml: EffectiveStylesFromOoxml
 
 	# Auxiliary data for intermediate steps
 	_discovered_effective_abstract_numberings: dict[int, Numbering] = {}
@@ -33,9 +33,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		) -> EffectiveNumberingsFromOoxml:
 		
 		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml = cls(
-			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles=effective_styles
+			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles_from_ooxml=effective_styles
 		)
-		effective_numberings_from_ooxml.load_effective_numberings()
+		effective_numberings_from_ooxml.load()
 
 		return effective_numberings_from_ooxml
 
@@ -51,7 +51,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				i: LevelProperties.aggregate_ooxml(
 					agg=agg_numbering.levels.get(i, None),
 					add=add_numbering.levels.get(i, None),
-					default_style=self.effective_styles.effective_styles["__DocDefaults__"]
+					default_style=self.effective_styles_from_ooxml.effective_styles[
+						self.effective_styles_from_ooxml.map_from_ooxml_style_id(ooxml_style_id="__DocDefaults__")
+					]
 				)
 				for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys()))
 			}
@@ -216,7 +218,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_abstract_numberings=[]
 				)
 
-	def load_effective_numberings(self) -> None:
+	def load(self) -> None:
 		"""
 		"""
 		self._compute_effective_numberings()
