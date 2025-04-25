@@ -18,8 +18,8 @@ class NumberingStyle(_NumberingStyle):
 	
 	:param _NumberingStyle: Incomplete class of NumberingStyle defined in 'styles.py'.
 	"""
-	abstract_numbering_parent: Optional[AbstractNumbering] = None
-	abstract_numbering_children: Optional[list[AbstractNumbering]] = None
+	abstract_numbering_parent: Optional[AbstractNumbering] = None  # w:styleLink
+	abstract_numbering_children: Optional[list[AbstractNumbering]] = None  # w:numStyleLink
 
 	numbering: Optional[Numbering] = None
 	
@@ -44,7 +44,7 @@ class Level(OoxmlElement):
 	# however, it should not be empty and always associated to an abstract numbering definition.
 	abstract_numbering: Optional[AbstractNumbering] = None
 
-	properties: Optional[list[OoxmlElement]] = None
+	properties: Optional[list[OoxmlElement]] = None  # TODO, this is actually never used because it doesnt have the commodity of xpath_query
 	run_properties: Optional[RunProperties] = None
 	paragraph_properties: Optional[ParagraphProperties] = None
 	
@@ -107,7 +107,10 @@ class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	Assumption: Only numbering styles can be associated to abstract numberings
 	 through the <w:numStyleLink> and <w:styleLink> mechanism
 	"""
-	style: Optional[NumberingStyle] = None  # numStyleLink
+	# Assumption: An abstract numbering can only have at maximum 1 style link
+	# Nowhere does it specify if there can be only one of each maximum
+	# ! TODO: Further investigate this
+	style_parent: Optional[NumberingStyle] = None  # numStyleLink
 	style_children: Optional[list[NumberingStyle]] = None  # styleLink
 
 	def __str__(self) -> str:
@@ -179,20 +182,20 @@ class AbstractNumbering(OoxmlElement):
 	@staticmethod
 	def _parse_associated_styles(
 		ooxml_abstract_numbering: OoxmlElement, styles: OoxmlStyles
-	) -> AbstractNumberingAssociatedStyles:
+	) -> Optional[AbstractNumberingAssociatedStyles]:
 		"""_summary_
 
 		:param ooxml_abstract_numbering: _description_
 		:param styles: _description_
 		:return: _description_
 		"""
-		style: Optional[NumberingStyle] = None
+		style_parent: Optional[NumberingStyle] = None
 		style_children: Optional[list[NumberingStyle]] = None
 
 		style_id: Optional[str] = ooxml_abstract_numbering.xpath_query(query="./w:numStyleLink/@w:val", singleton=True)
 		if style_id is not None:
-			style = styles.find(id=str(style_id), type=OoxmlStyleTypes.NUMBERING)
-			if style is None:
+			style_parent = styles.find(id=str(style_id), type=OoxmlStyleTypes.NUMBERING)
+			if style_parent is None:
 				raise ValueError("was not able to find style from .find() when it should exist")  # TODO
 
 		style_children_ids: Optional[list[str]] = ooxml_abstract_numbering.xpath_query(query="./w:styleLink/@w:val")
@@ -206,8 +209,8 @@ class AbstractNumbering(OoxmlElement):
 					raise ValueError("was not able to find style from .find() when it should exist")  # TODO
 		
 		return (
-			AbstractNumberingAssociatedStyles(style=style, style_children=style_children) 
-			if style is not None or style_children is not None else None
+			AbstractNumberingAssociatedStyles(style_parent=style_parent, style_children=style_children) 
+			if style_parent is not None or style_children is not None else None
 		)
 	
 	def _associate_to_levels_and_styles(self) -> None:
@@ -216,11 +219,11 @@ class AbstractNumbering(OoxmlElement):
 			level.abstract_numbering = self
 		
 		if self.associated_styles is not None:
-			if self.associated_styles.style is not None:
+			if self.associated_styles.style_parent is not None:
 				# Associate to the numbering style which the abstract numbering is based on (<w:numStyleLink>)
-				if self.associated_styles.style.abstract_numbering_children is None:
-					self.associated_styles.style.abstract_numbering_children = []
-				self.associated_styles.style.abstract_numbering_children.append(self)
+				if self.associated_styles.style_parent.abstract_numbering_children is None:
+					self.associated_styles.style_parent.abstract_numbering_children = []
+				self.associated_styles.style_parent.abstract_numbering_children.append(self)
 
 			if self.associated_styles.style_children is not None:
 				# Associate to the numbering styles which are based on the abstract numbering (<w:styleLink>)
@@ -250,7 +253,6 @@ class LevelOverride(OoxmlElement):
 	"""
 	id: int
 	level: Optional[Level] = None
-	start: Optional[int] = None
 
 	# Note that numbering and overridden level are optional in order to facilitate the construction
 	# however, they should not be empty and always associated to a numbering instance and the respective overridden level.
@@ -265,13 +267,11 @@ class LevelOverride(OoxmlElement):
 		:return: _description_
 		"""
 		id: int = int(ooxml_level_override.xpath_query(query="./@w:ilvl", nullable=False, singleton=True))
-		start: Optional[int] = ooxml_level_override.xpath_query(query="./w:startOverride/@w:val", singleton=True)
 
 		return cls(
 			element=ooxml_level_override.element,
 			id=id,
-			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id),
-			start=int(start) if start is not None else None
+			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id)
 		)
 
 	@staticmethod
@@ -381,7 +381,11 @@ class Numbering(OoxmlElement):
 		level_overrides: dict[int, LevelOverride] = {}
 		for ooxml_level_override in ooxml_level_overrides:
 			level_override: LevelOverride = LevelOverride.parse(ooxml_level_override=ooxml_level_override, styles=styles)
-			level_override.overridden_level = abstract_numbering.levels[level_override.id]  # Associate overridden level
+			
+			# Associate overridden level (if level exists in abstract numbering)
+			if level_override.id in abstract_numbering.levels.keys():
+				level_override.overridden_level = abstract_numbering.levels[level_override.id]
+
 			level_overrides[level_override.id] = level_override
 
 		return level_overrides
@@ -413,14 +417,20 @@ class Numbering(OoxmlElement):
 			if level.style.id == style.id:
 				return i
 		
-		# ! Might be the case that it is assumed that the level to be used is the lowest one available...
-
-		raise ValueError("") # TODO
+		# In some cases (because of ooxml manipulation from external programs),	
+		#  it might be assumed that the level to be used is the lowest one available.
+		# Raise a warning to log that this assumption has been made.
+		print(f"\033[33m[Warning] Lowest indentation level assumption made for: {style.id=}\033[0m")
+		return 0
 
 
 def _reload_incomplete_numbering_styles_into_complete(numbering_styles: list[_NumberingStyle]) -> None:
 	for numbering_style in numbering_styles:
+		# Monkey patching
 		numbering_style.__class__ = NumberingStyle
+		numbering_style.abstract_numbering_parent = None
+		numbering_style.abstract_numbering_children = None
+		numbering_style.numbering = None
 
 		if numbering_style.children is not None:
 			_reload_incomplete_numbering_styles_into_complete(numbering_styles=numbering_style.children)
@@ -511,13 +521,13 @@ class OoxmlNumberings(ArbitraryBaseModel):
 				numbering: Optional[Numbering] = self.find(id=int(numbering_id)) if numbering_id is not None else None
 				if numbering is not None:
 					style.numbering = numbering
-				else:
+				elif numbering_id is not None:
 					# In some cases (because of ooxml manipulation from external programs),
 					#  there is a numbering reference to an inexistent numbering instance.
 					# They are harmless and will be corrected in the abstract_docx normalization step.
 					# Raises a warning instead of an error and proceeds.
 					print(
-						f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
+						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
 					)
 
 			if style.children is not None:

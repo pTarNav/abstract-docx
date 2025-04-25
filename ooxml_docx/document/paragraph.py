@@ -16,8 +16,8 @@ from ooxml_docx.document.run import Run
 
 
 class OoxmlHyperlinkType(Enum):
-	internal = "INTERNAL"
-	external = "EXTERNAL"
+	INTERNAL = "internal"
+	EXTERNAL = "external"
 
 
 class BookmarkDelimiter(ArbitraryBaseModel):
@@ -107,11 +107,11 @@ class Hyperlink(OoxmlElement):
 		"""
 		relationship_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@r:id", singleton=True)
 		if relationship_id is not None:
-			return OoxmlHyperlinkType.external
+			return OoxmlHyperlinkType.EXTERNAL
 		
 		anchor_id: Optional[str] = ooxml_hyperlink.xpath_query(query="./@w:anchor", singleton=True)
 		if anchor_id is not None:
-			return OoxmlHyperlinkType.internal
+			return OoxmlHyperlinkType.INTERNAL
 
 		raise ValueError("Undefined hyperlink type, cannot find target id reference")
 
@@ -124,10 +124,10 @@ class Hyperlink(OoxmlElement):
 		:param ooxml_hyperlink: _description_
 		:return: _description_
 		"""
-		if type == OoxmlHyperlinkType.external:
+		if type == OoxmlHyperlinkType.EXTERNAL:
 			relationship_id: str = str(ooxml_hyperlink.xpath_query(query="./@r:id", nullable=False, singleton=True))
 			return relationships.content[relationship_id].target
-		elif type == OoxmlHyperlinkType.internal:
+		elif type == OoxmlHyperlinkType.INTERNAL:
 			return None
 
 	def __str__(self) -> str:
@@ -256,7 +256,7 @@ class Paragraph(OoxmlElement):
 				#  there is a numbering reference to an inexistent numbering instance.
 				# They are harmless and will be corrected in the abstract_docx normalization step.
 				# Raises a warning instead of an error and proceeds.
-				print(f"\033[33mWarning: Inexistent numbering referenced: {numbering_id=}\033[0m")
+				print(f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=}\033[0m")
 				return None				
 
 			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
