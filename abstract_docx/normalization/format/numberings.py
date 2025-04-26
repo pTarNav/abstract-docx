@@ -51,9 +51,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				i: LevelProperties.aggregate_ooxml(
 					agg=agg_numbering.levels.get(i, None),
 					add=add_numbering.levels.get(i, None),
-					default_style=self.effective_styles_from_ooxml.effective_styles[
-						self.effective_styles_from_ooxml.map_from_ooxml_style_id(ooxml_style_id="__DocDefaults__")
-					]
+					default_style=self.effective_styles_from_ooxml.get_default()
 				)
 				for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys()))
 			}

@@ -1,5 +1,8 @@
-from ooxml_docx.ooxml import OoxmlElement
+from __future__ import annotations
+from typing import Optional
 
+from ooxml_docx.ooxml import OoxmlElement
+from pydantic import PrivateAttr
 
 class OoxmlProperties(OoxmlElement):
 	"""
@@ -37,9 +40,17 @@ class RunProperties(OoxmlProperties):
 
 
 class ParagraphProperties(OoxmlProperties):
+	_run_properties: Optional[RunProperties] = PrivateAttr(default=None)
+
 	def __init__(self, ooxml: OoxmlElement):
 		super().__init__(element=ooxml.element, tag="pPr")
-
+	
+		ooxml_run_properties: Optional[OoxmlElement] = ooxml.xpath_query(query="./rPr", singleton=True)
+		self._run_properties = RunProperties(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None
+	
+	@property
+	def run_properties(self) -> Optional[RunProperties]:
+		return self._run_properties
 
 class TableProperties(OoxmlProperties):
 	def __init__(self, ooxml: OoxmlElement):

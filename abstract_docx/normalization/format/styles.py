@@ -44,10 +44,8 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 		effective_styles_from_ooxml: EffectiveStylesFromOoxml = cls(
 			ooxml_styles=ooxml_styles, effective_styles={effective_default_style.id: effective_default_style}
 		)
-		effective_styles_from_ooxml.load()
-		print(len(effective_styles_from_ooxml.effective_styles.keys()))
+		effective_styles_from_ooxml.load()		
 		effective_styles_from_ooxml.deduplicate()
-		print(len(effective_styles_from_ooxml.effective_styles.keys()))
 
 		return effective_styles_from_ooxml
 	
@@ -181,8 +179,15 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 			for style_id in style_ids:
 				self.map_effective_to_effective_deduplicated_styles[style_id] = group_id
 	
-	def map_from_ooxml_style_id(self, ooxml_style_id: str) -> str:
-		return self.map_effective_to_effective_deduplicated_styles[
-			self.map_ooxml_to_effective_merged_styles.get(ooxml_style_id, ooxml_style_id)
-		]
+	def get_mapped_id(self, ooxml_style_id: str) -> str:
+		effective_merged_style_id: str = self.map_ooxml_to_effective_merged_styles.get(ooxml_style_id, ooxml_style_id)
+		return self.map_effective_to_effective_deduplicated_styles.get(effective_merged_style_id, effective_merged_style_id)
+
+	def get(self, ooxml_style_id: str) -> Optional[Style]:
+		return self.effective_styles.get(self.get_mapped_id(ooxml_style_id=ooxml_style_id))
+
+	def get_default(self) -> Style:
+		return self.get(ooxml_style_id="__DocDefaults__")
+
+
 					

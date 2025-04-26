@@ -6,8 +6,10 @@ from itertools import combinations
 from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.docx import OoxmlDocx
+import ooxml_docx.document as OOXML_DOCUMENT
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
+from abstract_docx.normalization.document import document_normalization
 from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
 
 class AbstractDocx(ArbitraryBaseModel):
@@ -31,4 +33,4 @@ if __name__ == "__main__":
 	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
 	z = EffectiveNumberingsFromOoxml.normalization(ooxml_numberings=x.ooxml_docx.structure.numberings, effective_styles=y)
 
-	print(y.effective_styles.keys())
+	document_normalization(x, y, z)

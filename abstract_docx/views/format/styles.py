@@ -336,6 +336,7 @@ class StyleProperties(ArbitraryBaseModel):
 	 - justification:
 	 - indentation:
 	TODO: Expand properties
+	!!!! TODO: Paragraph properties can also contain run properties, need to take this into account !!!!
 	"""
 	run_style_properties: RunStyleProperties
 	paragraph_style_properties: ParagraphStyleProperties
