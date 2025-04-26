@@ -67,8 +67,9 @@ class Level(OoxmlElement):
 				query="./*[not(self::w:name or self::w:pPr or self::w:rPr or self::w:pStyle)]"
 			),
 			run_properties=RunProperties(ooxml=ooxml_run_properties) if ooxml_run_properties is not None else None,
-			paragraph_properties=ParagraphProperties(ooxml=ooxml_paragraph_properties)
-			if ooxml_paragraph_properties is not None else None,
+			paragraph_properties=(
+				ParagraphProperties(ooxml=ooxml_paragraph_properties) if ooxml_paragraph_properties is not None else None
+			),
 			style=cls._parse_style(ooxml_level=ooxml_level, styles=styles)
 		)
 	

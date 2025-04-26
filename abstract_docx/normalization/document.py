@@ -3,6 +3,7 @@ import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
 from abstract_docx.views.format.styles import Style, StyleProperties
 
 def document_normalization(ooxml_document, effective_styles, effective_numberings):
+	return
 	for p in ooxml_document.ooxml_docx.structure.document.body:
 		if isinstance(p, OOXML_PARAGRAPH.Paragraph):
 			print("+"*42)

@@ -127,7 +127,7 @@ class Restart(int):
 		return cls(int(v))
 
 
-class LevelStyleProperties(ArbitraryBaseModel):
+class LevelProperties(ArbitraryBaseModel):
 	marker_pattern: Optional[MarkerPattern] = None
 	marker_type: Optional[MarkerType] = None
 	whitespace: Optional[Whitespace] = None
@@ -135,7 +135,7 @@ class LevelStyleProperties(ArbitraryBaseModel):
 	restart: Optional[Restart] = None
 
 	@classmethod
-	def default(cls) -> LevelStyleProperties:
+	def default(cls) -> LevelProperties:
 		return cls(
 			marker_patter=MarkerPattern.default(),
 			marker_type=MarkerType.default(),
@@ -145,7 +145,7 @@ class LevelStyleProperties(ArbitraryBaseModel):
 		)
 
 	@classmethod
-	def from_ooxml(cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False) -> LevelStyleProperties:
+	def from_ooxml(cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False) -> LevelProperties:
 		# TODO: change level with level properties once we figure a way to make level properties easier to access
 		if level is not None:
 			return cls(
@@ -172,7 +172,7 @@ class LevelStyleProperties(ArbitraryBaseModel):
 		return cls()
 
 	@classmethod
-	def aggregate_ooxml(cls, agg: Optional[LevelStyleProperties], add: Optional[LevelStyleProperties]) -> LevelProperties:
+	def aggregate_ooxml(cls, agg: Optional[LevelProperties], add: Optional[LevelProperties]) -> LevelProperties:
 		match agg is not None, add is not None:
 			case True, True:
 				return cls(
@@ -192,64 +192,68 @@ class LevelStyleProperties(ArbitraryBaseModel):
 				# If this happens something has terribly gone wrong.
 				raise ValueError("")
 
+# class LevelProperties(ArbitraryBaseModel):
+# 	level_style_properties: LevelStyleProperties
 
-class LevelProperties(ArbitraryBaseModel):
-	level_style_properties: LevelStyleProperties
+# 	run_style_properties: RunStyleProperties
+# 	paragraph_style_properties: ParagraphStyleProperties
 
-	run_style_properties: RunStyleProperties
-	paragraph_style_properties: ParagraphStyleProperties
+# 	@classmethod
+# 	def default(cls) -> LevelProperties:
+# 		return cls(
+# 			level_style_properties=LevelStyleProperties.default(),
+# 			run_style_properties=RunStyleProperties.default(),
+# 			paragraph_style_properties=ParagraphStyleProperties.default()
+# 		)
 
-	@classmethod
-	def default(cls) -> LevelProperties:
-		return cls(
-			level_style_properties=LevelStyleProperties.default(),
-			run_style_properties=RunStyleProperties.default(),
-			paragraph_style_properties=ParagraphStyleProperties.default()
-		)
+# 	@classmethod
+# 	def from_ooxml(
+# 		cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False
+# 	) -> LevelProperties:
+# 		if level is not None:
+# 			return cls(
+# 				level_style_properties=LevelStyleProperties.from_ooxml(level=level, must_default=must_default),
+# 				run_style_properties=RunStyleProperties.from_ooxml(
+# 					run_properties=level.run_properties, must_default=must_default
+# 				),
+# 				paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
+# 					paragraph_properties=level.paragraph_properties, must_default=must_default
+# 				)
+# 			)
 
-	@classmethod
-	def from_ooxml(
-		cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False
-	) -> LevelProperties:
-		if level is not None:
-			return cls(
-				level_style_properties=LevelStyleProperties.from_ooxml(level=level, must_default=must_default),
-				run_style_properties=RunStyleProperties.from_ooxml(
-					run_properties=level.run_properties, must_default=must_default
-				),
-				paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
-					paragraph_properties=level.paragraph_properties, must_default=must_default
-				)
-			)
-
-		if must_default:
-			return cls.default()
+# 		if must_default:
+# 			return cls.default()
 		
-		return cls()
+# 		return cls()
 	
-	@classmethod
-	def aggregate_ooxml(cls, agg: Optional[LevelProperties], add: Optional[LevelProperties], default_style: Style) -> LevelProperties:
-		return cls(
-			level_style_properties=LevelStyleProperties.aggregate_ooxml(
-				agg=agg.level_style_properties if agg is not None else None,
-				add=add.level_style_properties if add is not None else None
-			),
-			run_style_properties=RunStyleProperties.aggregate_ooxml(
-				agg=agg.run_style_properties if agg is not None else default_style.properties.run_style_properties,
-				add=add.run_style_properties if add is not None else default_style.properties.run_style_properties,
-				default=default_style.properties.run_style_properties
-			),
-			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
-				agg=agg.paragraph_style_properties if agg is not None else default_style.properties.paragraph_style_properties,
-				add=add.paragraph_style_properties if add is not None else default_style.properties.paragraph_style_properties,
-			)
-		)
+# 	@classmethod
+# 	def aggregate_ooxml(cls, agg: Optional[LevelProperties], add: Optional[LevelProperties], default_style: Style) -> LevelProperties:
+# 		return cls(
+# 			level_style_properties=LevelStyleProperties.aggregate_ooxml(
+# 				agg=agg.level_style_properties if agg is not None else None,
+# 				add=add.level_style_properties if add is not None else None
+# 			),
+# 			run_style_properties=RunStyleProperties.aggregate_ooxml(
+# 				agg=agg.run_style_properties if agg is not None else default_style.properties.run_style_properties,
+# 				add=add.run_style_properties if add is not None else default_style.properties.run_style_properties,
+# 				default=default_style.properties.run_style_properties
+# 			),
+# 			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
+# 				agg=agg.paragraph_style_properties if agg is not None else default_style.properties.paragraph_style_properties,
+# 				add=add.paragraph_style_properties if add is not None else default_style.properties.paragraph_style_properties,
+# 			)
+# 		)
 
+class Level(ArbitraryBaseModel):
+	id: int
+
+	properties: LevelProperties
+	style: Style
 
 class Numbering(ArbitraryBaseModel):
 	id: int
 
-	levels: dict[int, LevelProperties]
+	levels: dict[int, Level]
 
 	parent: Optional[Numbering] = None
 	children: Optional[list[Numbering]] = None
