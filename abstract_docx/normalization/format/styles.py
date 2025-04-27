@@ -44,7 +44,7 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 		effective_styles_from_ooxml: EffectiveStylesFromOoxml = cls(
 			ooxml_styles=ooxml_styles, effective_styles={effective_default_style.id: effective_default_style}
 		)
-		effective_styles_from_ooxml.load()		
+		effective_styles_from_ooxml.load()
 		effective_styles_from_ooxml.deduplicate()
 
 		return effective_styles_from_ooxml

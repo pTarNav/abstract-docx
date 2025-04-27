@@ -252,13 +252,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_abstract_numberings=[]
 				)
 
-	def load(self) -> None:
+	def _associate_effective_styles(self) -> None:
+		"""_summary_
 		"""
-		"""
-		self._compute_effective_numberings()
-		self.load_implicit_effective_numberings_effective_styles()
-
-	def load_implicit_effective_numberings_effective_styles(self) -> None:
 		for effective_numbering in self.effective_numberings.values():
 			for effective_level in effective_numbering.levels.values():
 				found_effective_style_match: bool = False
@@ -269,4 +265,10 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 						break
 				
 				if not found_effective_style_match:
-					self.effective_styles_from_ooxml.effective_styles[effective_level.style.id] = effective_level
+					self.effective_styles_from_ooxml.effective_styles[effective_level.style.id] = effective_level.style
+
+	def load(self) -> None:
+		"""
+		"""
+		self._compute_effective_numberings()
+		self._associate_effective_styles()
