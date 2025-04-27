@@ -1,119 +1,171 @@
+from __future__ import annotations
+from typing import Optional
 import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
 
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
 
 from abstract_docx.views.format.styles import Style, StyleProperties
-from abstract_docx.views.document import Paragraph, Run, Block
+from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink
 
 import ooxml_docx.document.run as OOXML_RUN
 from abstract_docx.views.format import Format
 
-def _associate_effective_styles(effective_blocks: list[Block], effective_styles_from_ooxml: EffectiveStylesFromOoxml) -> None:
-	"""_summary_
-	"""
-	# TODO: optimize this loops
-	for effective_block in effective_blocks:
-			if isinstance(effective_block, Paragraph):
-				found_effective_style_match: bool = False
-				for effective_style in effective_styles_from_ooxml.effective_styles.values():
-						if effective_block.format.style == effective_style:
-							effective_block.format.style = effective_style
-							found_effective_style_match = True
-							break
-				
-				if not found_effective_style_match:
-					effective_styles_from_ooxml.effective_styles[effective_block.format.style.id] = effective_block.format.style
+from ooxml_docx.structure.document import OoxmlDocument
+from utils.pydantic import ArbitraryBaseModel
 
-				for effective_text in effective_block.content:
-					found_effective_style_match: bool = False
-					for effective_style in effective_styles_from_ooxml.effective_styles.values():
-							if effective_text.style == effective_style:
-								effective_text.style = effective_style
-								found_effective_style_match = True
-								break
-					
-					if not found_effective_style_match:
-						effective_styles_from_ooxml.effective_styles[effective_text.style.id] = effective_text.style
 
-def content_normalization(ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, effective_paragraph_style: Style, effective_styles_from_ooxml: EffectiveStylesFromOoxml, block_id: int) -> list[Run]:
-	content: list[Run] = []
-	for c in ooxml_paragraph.content:
-		content_id = f"__@PARAGRAPH={block_id}@RUN={len(content)}__"
-		if isinstance(c, OOXML_RUN.Run):
-			if c.style is not None:
-				effective_run_style: Style = Style(
-					id=content_id,
-					properties=StyleProperties.aggregate_ooxml(
-						agg=effective_paragraph_style.properties,
-						add=effective_styles_from_ooxml.get(ooxml_style_id=c.style.id).properties,
-						default=effective_styles_from_ooxml.get_default().properties
-					)
-				)
-			else:
-				effective_run_style: Style = effective_paragraph_style
-			
-			if c.properties is not None:
-				effective_run_style: Style = Style(
-					id=content_id,
-					properties=StyleProperties.aggregate_ooxml(
-						agg=effective_run_style.properties,
-						add=StyleProperties.from_ooxml(run_properties=c.properties),
-						default=effective_styles_from_ooxml.get_default().properties
-					)
-				)
+class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
+	ooxml_document: OoxmlDocument
+	effective_document: dict[int, Block]
 
-			curr_run = Run.from_ooxml(ooxml_run=c, style=effective_run_style)
-			if len(content) > 0 and isinstance(content[-1], Run) and content[-1].style == curr_run.style:
-				content[-1].concat(other=curr_run)
-			else:
-				content.append(curr_run)
+	effective_styles_from_ooxml: EffectiveStylesFromOoxml
+	effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml
+
+	@classmethod
+	def normalization(
+		cls,
+		ooxml_document: OoxmlDocument,
+		effective_styles_from_ooxml: EffectiveStylesFromOoxml,
+		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml
+	) -> EffectiveDocumentFromOoxml:
+		effective_document_from_ooxml: EffectiveDocumentFromOoxml = cls(
+			ooxml_document=ooxml_document,
+			effective_document={},
+			effective_styles_from_ooxml=effective_styles_from_ooxml,
+			effective_numberings_from_ooxml=effective_numberings_from_ooxml
+		)
+		effective_document_from_ooxml.load()
+
+		return effective_document_from_ooxml
 	
-	return content
-
-
-def document_normalization(ooxml_document, effective_styles_from_ooxml: EffectiveStylesFromOoxml, effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml):
-	effective_blocks: list[Block] = []
-	for block_id, p in enumerate(ooxml_document.ooxml_docx.structure.document.body):
-		if isinstance(p, OOXML_PARAGRAPH.Paragraph):
-			# TODO: actually assign effective style to paragraph data model
-			if p.properties is not None:
-				effective_paragraph_style: Style = Style(
-					id=f"__@PARAGRAPH={block_id}__",
-					properties=StyleProperties.aggregate_ooxml(
-						agg=(
-							effective_styles_from_ooxml.get(ooxml_style_id=p.style.id).properties
-							if p.style is not None else effective_styles_from_ooxml.get_default().properties
-						),
-						add=(StyleProperties.from_ooxml(run_properties=p.properties.run_properties, paragraph_properties=p.properties)),
-						default=effective_styles_from_ooxml.get_default().properties
-					)
+	def compute_effective_run(self, ooxml_run: OOXML_RUN.Run, effective_paragraph_style: Style, run_id_str: str) -> Run:
+		if ooxml_run.style is not None:
+			effective_run_style: Style = Style(
+				id=run_id_str,
+				properties=StyleProperties.aggregate_ooxml(
+					agg=effective_paragraph_style.properties,
+					add=self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_run.style.id).properties,
+					default=self.effective_styles_from_ooxml.get_default().properties
 				)
-
-				found_effective_style_match: bool = False
-				for effective_style in effective_styles_from_ooxml.effective_styles.values():
-					if effective_paragraph_style == effective_style:
-						effective_paragraph_style = effective_style
-						found_effective_style_match = True
-						break
-				
-				if not found_effective_style_match:
-					effective_styles_from_ooxml.effective_styles[effective_paragraph_style.id] = effective_paragraph_style
-			else:
-				if p.style is not None:
-					effective_paragraph_style: Style = effective_styles_from_ooxml.get(ooxml_style_id=p.style.id)
-				else:
-					effective_paragraph_style: Style = effective_styles_from_ooxml.get_default()
-			
-			effective_paragraph_content = content_normalization(ooxml_paragraph=p, effective_paragraph_style=effective_paragraph_style, effective_styles_from_ooxml=effective_styles_from_ooxml, block_id=block_id)
-			effective_paragraph: Paragraph = Paragraph(
-				id=block_id,
-				content=effective_paragraph_content,
-				format=Format(style=effective_paragraph_style)
 			)
-			effective_blocks.append(effective_paragraph)
-			print([x.text for x in effective_paragraph.content])
+		else:
+			effective_run_style: Style = effective_paragraph_style
+		
+		if ooxml_run.properties is not None:
+			effective_run_style: Style = Style(
+				id=run_id_str,
+				properties=StyleProperties.aggregate_ooxml(
+					agg=effective_run_style.properties,
+					add=StyleProperties.from_ooxml(run_properties=ooxml_run.properties),
+					default=self.effective_styles_from_ooxml.get_default().properties
+				)
+			)
+
+		return Run.from_ooxml(ooxml_run=ooxml_run, style=effective_run_style)
+
+	def _compute_effective_texts(
+			self, ooxml_texts: list[OOXML_RUN.Run | OOXML_PARAGRAPH.Hyperlink], effective_paragraph_style: Style, block_id: int
+		) -> list[Text]:
+		effective_texts: list[Text] = []
+		for ooxml_text in ooxml_texts:
+			# Use length of seen content since it may not match the original length due to normalization
+			text_id = len(effective_texts)
+			
+			curr_text: Optional[Text] = None
+			if isinstance(ooxml_text, OOXML_RUN.Run):
+				run_id_str = f"__@PARAGRAPH={block_id}@RUN={text_id}__"
+				curr_text: Run = self.compute_effective_run(
+					ooxml_run=ooxml_text, effective_paragraph_style=effective_paragraph_style, run_id_str=run_id_str
+				)
+			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):
+				print("a")
+
+			if curr_text is not None:
+				# Concatenate with previous text if possible
+				if (
+					len(effective_texts) > 0 and isinstance(effective_texts[-1], type(curr_text))
+					and effective_texts[-1].style == curr_text.style
+				):
+					effective_texts[-1].concat(other=curr_text)
+				else:
+					effective_texts.append(curr_text)
+		
+		return effective_texts
 	
-	print(set(effective_styles_from_ooxml.effective_styles.keys()))
-	_associate_effective_styles(effective_blocks=effective_blocks, effective_styles_from_ooxml=effective_styles_from_ooxml) # TODO. here we are doing more work than necessary, at a pragraph level we already do the style check and insertion
-	print(set(effective_styles_from_ooxml.effective_styles.keys()))
+	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
+		if ooxml_paragraph.properties is not None:
+			effective_paragraph_style: Style = Style(
+				id=f"__@PARAGRAPH={block_id}__",
+				properties=StyleProperties.aggregate_ooxml(
+					agg=(
+						self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_paragraph.style.id).properties
+						if ooxml_paragraph.style is not None else self.effective_styles_from_ooxml.get_default().properties
+					),
+					add=(
+						StyleProperties.from_ooxml(
+							run_properties=ooxml_paragraph.properties.run_properties, paragraph_properties=ooxml_paragraph.properties
+						)
+					),
+					default=self.effective_styles_from_ooxml.get_default().properties
+				)
+			)
+			
+			# TODO: this will be done in _associate_effective_styles
+			# found_effective_style_match: bool = False
+			# for effective_style in effective_styles_from_ooxml.effective_styles.values():
+			# 	if effective_paragraph_style == effective_style:
+			# 		effective_paragraph_style = effective_style
+			# 		found_effective_style_match = True
+			# 		break
+			
+			# if not found_effective_style_match:
+			# 	effective_styles_from_ooxml.effective_styles[effective_paragraph_style.id] = effective_paragraph_style
+		else:
+			if ooxml_paragraph.style is not None:
+				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_paragraph.style.id)
+			else:
+				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get_default()
+		
+		effective_paragraph_content: list[Text] = self._compute_effective_texts(
+			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
+		)
+		effective_paragraph: Paragraph = Paragraph(
+			id=block_id,
+			content=effective_paragraph_content,
+			format=Format(style=effective_paragraph_style)
+		)
+		self.effective_document[block_id] = effective_paragraph
+
+	def _compute_effective_blocks(self) -> None:
+		"""
+		Iterate through the blocks of the document, routing each block according to the type of block
+		"""
+		for block_id, ooxml_block in enumerate(self.ooxml_document.body):
+			match type(ooxml_block):
+				case OOXML_PARAGRAPH.Paragraph:
+					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
+				case _:
+					continue
+					raise ValueError("")  # TODO
+
+	def _associate_effective_styles(self) -> None:
+		"""_summary_
+		"""
+		# TODO: optimize this loops
+		for k, effective_block in self.effective_document.items():
+			found_effective_style_match: bool = False
+			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
+				if effective_block.format.style == effective_style:
+					effective_block.format.style = effective_style
+					found_effective_style_match = True
+					break
+			
+			if not found_effective_style_match:
+				effective_block_style_id: str = effective_block.format.style.id
+				self.effective_styles_from_ooxml.effective_styles[effective_block_style_id] = effective_block.format.style
+
+	def load(self) -> None:
+		self._compute_effective_blocks()
+		self._associate_effective_styles()
+	

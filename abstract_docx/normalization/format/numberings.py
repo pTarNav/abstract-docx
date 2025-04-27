@@ -30,11 +30,11 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 	@classmethod
 	def normalization(
-			cls, ooxml_numberings: OoxmlNumberings, effective_styles: EffectiveStylesFromOoxml
+			cls, ooxml_numberings: OoxmlNumberings, effective_styles_from_ooxml: EffectiveStylesFromOoxml
 		) -> EffectiveNumberingsFromOoxml:
 		
 		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml = cls(
-			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles_from_ooxml=effective_styles
+			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles_from_ooxml=effective_styles_from_ooxml
 		)
 		effective_numberings_from_ooxml.load()
 
@@ -88,6 +88,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings: list[int],
 			visited_ooxml_abstract_numberings: list[int]
 		) -> Optional[Numbering]:
+		# TODO: maybe divide this function into several chunks, it is too long for sure-
 		effective_numbering: Optional[Numbering] = None
 		effective_abstract_numbering: Optional[Numbering] = None
 
@@ -150,6 +151,8 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings: list[int],
 			visited_ooxml_abstract_numberings: list[int]
 		) -> None:
+		# TODO: maybe divide this function into several chunks, it is too long for sure-
+
 		# Keeps track whether it is the end of the recursion, if it is it must default
 		must_default = True
 
