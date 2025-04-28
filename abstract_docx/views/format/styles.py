@@ -30,7 +30,22 @@ class FontSize(float):
 class FontColor(Color):
 	@classmethod
 	def default(cls) -> FontColor:
-		return cls(Color(color="black"))
+		return cls("#000000")
+
+	@classmethod
+	def from_ooxml_val(cls, v:Optional[str], must_default: bool=False) -> Optional[FontColor]:
+		if v is None:
+			if must_default:
+				return cls.default()
+			return None
+
+		val = v.strip().lower()
+		if val == "auto":
+			return cls.default() if must_default else None
+
+		hex_str = f"#{v.strip()}"
+
+		return cls(hex_str)
 
 
 class FontScript(Enum):
@@ -158,7 +173,9 @@ class RunStyleProperties(ArbitraryBaseModel):
 				font_script=FontScript.from_ooxml_val(
 					v=run_properties.xpath_query(query="./w:vertAlign/@w:val", singleton=True), must_default=must_default
 				),
-				font_color=FontColor.default(),  # TODO: actually implement color parsing
+				font_color=FontColor.from_ooxml_val(
+					v=run_properties.xpath_query(query="./w:color/@w:val", singleton=True), must_default=must_default
+				),
 				bold=Bold.from_ooxml(
 					el=run_properties.xpath_query(query="./w:b", singleton=True), must_default=must_default
 				),
