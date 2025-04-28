@@ -111,16 +111,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				)
 			)
 			
-			# TODO: this will be done in _associate_effective_styles
-			# found_effective_style_match: bool = False
-			# for effective_style in effective_styles_from_ooxml.effective_styles.values():
-			# 	if effective_paragraph_style == effective_style:
-			# 		effective_paragraph_style = effective_style
-			# 		found_effective_style_match = True
-			# 		break
-			
-			# if not found_effective_style_match:
-			# 	effective_styles_from_ooxml.effective_styles[effective_paragraph_style.id] = effective_paragraph_style
 		else:
 			if ooxml_paragraph.style is not None:
 				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_paragraph.style.id)
@@ -145,15 +135,15 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			match type(ooxml_block):
 				case OOXML_PARAGRAPH.Paragraph:
 					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
+					self._associate_effective_text_styles
 				case _:
 					continue
 					raise ValueError("")  # TODO
 
-	def _associate_effective_styles(self) -> None:
+	def _associate_effective_block_styles(self) -> None:
 		"""_summary_
 		"""
-		# TODO: optimize this loops
-		for k, effective_block in self.effective_document.items():
+		for effective_block in self.effective_document.values():
 			found_effective_style_match: bool = False
 			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
 				if effective_block.format.style == effective_style:
@@ -164,8 +154,26 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			if not found_effective_style_match:
 				effective_block_style_id: str = effective_block.format.style.id
 				self.effective_styles_from_ooxml.effective_styles[effective_block_style_id] = effective_block.format.style
+			
+			if isinstance(effective_block, Paragraph):
+				self._associate_effective_text_styles(effective_texts=effective_block.content)
+
+	
+	def _associate_effective_text_styles(self, effective_texts: list[Text]) -> None:
+		# TODO: Optimize this loop so the inner effective styles loop is only done once
+		for effective_text in effective_texts:
+			found_effective_style_match: bool = False
+			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
+				if effective_text.style == effective_style:
+					effective_text.style = effective_style
+					found_effective_style_match = True
+					break
+			
+			if not found_effective_style_match:
+				self.effective_styles_from_ooxml.effective_styles[effective_text.style.id] = effective_text.style
 
 	def load(self) -> None:
 		self._compute_effective_blocks()
-		self._associate_effective_styles()
+		self._associate_effective_block_styles()
+		
 	
