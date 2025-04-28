@@ -2,7 +2,10 @@ from __future__ import annotations
 from typing import Optional
 from enum import Enum
 
-from colour import Color
+import re
+
+from num2words import num2words
+import roman
 
 from utils.pydantic import ArbitraryBaseModel
 
@@ -26,8 +29,39 @@ class MarkerPattern(str):
 			
 			return cls.default()
 		
-		return cls("{0}, {2}")	# TODO: parse %d with regex and prepare accordingly
+		# Ensure that any desired open and close brackets will be kept when .format() is applied
+		v = v.replace("{", "{{")
+		v = v.replace("}", "}}")
+
+		# Replace %n with {n-1}
+		def _replace(match: re.Match) -> str:
+			level = int(match.group(1))
+			return "{" + str(level - 1) + "}"
+
+		return cls(re.sub(r"%(\d+)", _replace, v))
+	
+	def format(self, levels_strings: dict[int, str]) -> str:
+		# Ensure that the levels_indexes has at least the highest level pattern
 		
+		placeholders = [int(idx) for idx in re.findall(r"\{(\d+)\}", self)]
+		if not placeholders:
+			return str(self)	
+
+		if max(placeholders) not in levels_strings.keys():
+			raise KeyError(f"Incomplete level indexes, missing at least {max(placeholders)=}")
+		
+		return super().format(*list(levels_strings.values()))
+
+
+def to_letters(n: int) -> str:
+	"""Convert a 1-based index to letters (A, B, ..., Z, AA, AB, ...)."""
+	result = ""
+	while n > 0:
+		n, rem = divmod(n - 1, 26)
+		char = chr(ord("A") + rem)
+		result = char + result
+	return result
+
 
 class MarkerType(Enum):
 	NONE = "none"
@@ -51,6 +85,7 @@ class MarkerType(Enum):
 		if not must_default and v is None:
 			return None
 		
+		# TODO: for decimalEnclosedParen, make sure to treat marker pattern aswell
 		return {
 			"none": cls.NONE,
 			"bullet": cls.BULLET,
@@ -67,7 +102,36 @@ class MarkerType(Enum):
 			"upperRoman": cls.UPPER_ROMAN
 		}.get(v, cls.default())
 
-	# TODO: get/format method
+	def format(self, index: int) -> str:
+		"""Return the formatted marker for a given 1-based index."""
+		match self:
+			case MarkerType.NONE:
+				return ""
+			case MarkerType.BULLET:
+				return "·"
+			case MarkerType.DECIMAL:
+				return str(index)
+			case MarkerType.DECIMAL_LEADING_ZERO:
+				return f"{index:02}"
+			case MarkerType.DECIMAL_ENCLOSED_CIRCLE:
+				# Unicode circled numbers start at ① (U+2460) for 1
+				code_point = 0x2460 + index - 1
+				try:
+					return chr(code_point)
+				except ValueError:
+					return str(index)
+			case MarkerType.CARDINAL:
+				return num2words(index, to='cardinal')
+			case MarkerType.ORDINAL:
+				return num2words(index, to='ordinal')
+			case MarkerType.LOWER_LETTER:
+				return to_letters(index).lower()
+			case MarkerType.UPPER_LETTER:
+				return to_letters(index).upper()
+			case MarkerType.LOWER_ROMAN:
+				return roman.toRoman(index).lower()
+			case MarkerType.UPPER_ROMAN:
+				return roman.toRoman(index).upper()
 
 class Whitespace(Enum):
 	NONE = "none"
@@ -192,58 +256,6 @@ class LevelProperties(ArbitraryBaseModel):
 				# If this happens something has terribly gone wrong.
 				raise ValueError("")
 
-# class LevelProperties(ArbitraryBaseModel):
-# 	level_style_properties: LevelStyleProperties
-
-# 	run_style_properties: RunStyleProperties
-# 	paragraph_style_properties: ParagraphStyleProperties
-
-# 	@classmethod
-# 	def default(cls) -> LevelProperties:
-# 		return cls(
-# 			level_style_properties=LevelStyleProperties.default(),
-# 			run_style_properties=RunStyleProperties.default(),
-# 			paragraph_style_properties=ParagraphStyleProperties.default()
-# 		)
-
-# 	@classmethod
-# 	def from_ooxml(
-# 		cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False
-# 	) -> LevelProperties:
-# 		if level is not None:
-# 			return cls(
-# 				level_style_properties=LevelStyleProperties.from_ooxml(level=level, must_default=must_default),
-# 				run_style_properties=RunStyleProperties.from_ooxml(
-# 					run_properties=level.run_properties, must_default=must_default
-# 				),
-# 				paragraph_style_properties=ParagraphStyleProperties.from_ooxml(
-# 					paragraph_properties=level.paragraph_properties, must_default=must_default
-# 				)
-# 			)
-
-# 		if must_default:
-# 			return cls.default()
-		
-# 		return cls()
-	
-# 	@classmethod
-# 	def aggregate_ooxml(cls, agg: Optional[LevelProperties], add: Optional[LevelProperties], default_style: Style) -> LevelProperties:
-# 		return cls(
-# 			level_style_properties=LevelStyleProperties.aggregate_ooxml(
-# 				agg=agg.level_style_properties if agg is not None else None,
-# 				add=add.level_style_properties if add is not None else None
-# 			),
-# 			run_style_properties=RunStyleProperties.aggregate_ooxml(
-# 				agg=agg.run_style_properties if agg is not None else default_style.properties.run_style_properties,
-# 				add=add.run_style_properties if add is not None else default_style.properties.run_style_properties,
-# 				default=default_style.properties.run_style_properties
-# 			),
-# 			paragraph_style_properties=ParagraphStyleProperties.aggregate_ooxml(
-# 				agg=agg.paragraph_style_properties if agg is not None else default_style.properties.paragraph_style_properties,
-# 				add=add.paragraph_style_properties if add is not None else default_style.properties.paragraph_style_properties,
-# 			)
-# 		)
-
 class Level(ArbitraryBaseModel):
 	id: int
 
@@ -257,3 +269,15 @@ class Numbering(ArbitraryBaseModel):
 
 	parent: Optional[Numbering] = None
 	children: Optional[list[Numbering]] = None
+
+	def format(self, level_indexes: dict[int, int]) -> str:
+		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
+			raise KeyError("Unable to map") # TODO
+		
+		level_strings: dict[int, str] = {}
+		for k, v in level_indexes.items():
+			level_strings[k] = self.levels[k].properties.marker_type.format(index=v)
+		
+		return self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+		
+		

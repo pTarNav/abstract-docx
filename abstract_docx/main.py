@@ -29,7 +29,7 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[1]}.docx")
+	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
 	# c_styles = 0
 	# for s in [root for root in x.normalized_ooxml_docx.structure.styles.roots.paragraph] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.run] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.table] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.numbering]:
 	# 	c_styles += len(s.fold(agg=[]))
@@ -41,7 +41,14 @@ if __name__ == "__main__":
 	
 	d = EffectiveDocumentFromOoxml.normalization(ooxml_document=x.normalized_ooxml_docx.structure.document, effective_styles_from_ooxml=y, effective_numberings_from_ooxml=z)
 	
-	for b in d.effective_document.values():
-		print(b.format.style.id, [x.text for x in b.content])
+	# for b in d.effective_document.values():
+	# 	print(b.format.style.id, [x.text for x in b.content])
 	
+	for a in z.effective_numberings.values():
+		for l in a.levels.values():
+			if l.properties.marker_pattern is not None:
+				print(a.id, l.id, ":", l.properties.marker_pattern, l.properties.marker_type, "=>", z.effective_numberings[a.id].format(level_indexes={k: k+1 for k in range(l.id+1)}))
+			else:
+				print("why is there a fking none here?")
+			
 	

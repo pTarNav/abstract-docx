@@ -79,7 +79,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					ooxml_run=ooxml_text, effective_paragraph_style=effective_paragraph_style, run_id_str=run_id_str
 				)
 			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):
-				print("a")
+				print("Hyperlink")
 
 			if curr_text is not None:
 				# Concatenate with previous text if possible
