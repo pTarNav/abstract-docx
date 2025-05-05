@@ -11,6 +11,9 @@ from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
 from abstract_docx.normalization.document import EffectiveDocumentFromOoxml
 from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
+from abstract_docx.views.format.numberings import Numbering
+
+from abstract_docx.normalization import EffectiveStructureFromOoxml
 
 class AbstractDocx(ArbitraryBaseModel):
 	"""
@@ -18,40 +21,20 @@ class AbstractDocx(ArbitraryBaseModel):
 	"""
 	file_path: str
 	ooxml_docx: OoxmlDocx
-	normalized_ooxml_docx: OoxmlDocx  # Initialized as a deep copy of the inputted ooxml_docx
+
+	_effective: EffectiveStructureFromOoxml
 
 	@classmethod
 	def read(cls, file_path: str) -> AbstractDocx:
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
+		_effective: EffectiveStructureFromOoxml = EffectiveStructureFromOoxml.normalization(ooxml_docx=ooxml_docx)
 
-		return cls(file_path=file_path, ooxml_docx=ooxml_docx, normalized_ooxml_docx=copy.deepcopy(ooxml_docx))
+		return cls(file_path=file_path, ooxml_docx=ooxml_docx, _effective=_effective)
+	
+	
 	
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[3]}.docx")
-	# c_styles = 0
-	# for s in [root for root in x.normalized_ooxml_docx.structure.styles.roots.paragraph] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.run] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.table] + [root for root in x.normalized_ooxml_docx.structure.styles.roots.numbering]:
-	# 	c_styles += len(s.fold(agg=[]))
-	# print(c_styles)
-	
-	y = EffectiveStylesFromOoxml.normalization(ooxml_styles=x.normalized_ooxml_docx.structure.styles)
-	
-	z = EffectiveNumberingsFromOoxml.normalization(ooxml_numberings=x.normalized_ooxml_docx.structure.numberings, effective_styles_from_ooxml=y)
-	
-	d = EffectiveDocumentFromOoxml.normalization(ooxml_document=x.normalized_ooxml_docx.structure.document, effective_styles_from_ooxml=y, effective_numberings_from_ooxml=z)
-	
-	# for b in d.effective_document.values():
-	# 	print(b.format.style.id, [x.text for x in b.content])
-	
-	# import re
-	# for a in z.effective_numberings.values():
-	# 	aa = a.detection_regexes
-	# 	print("#"*42)
-	# 	for l in a.levels.values():
-	# 		if l.properties.marker_pattern != "":
-	# 			print(a.id, l.id, ":", l.properties.marker_pattern, l.properties.marker_type, "=>", z.effective_numberings[a.id].format(level_indexes={k: k+1 for k in range(l.id+1)}))
-	# 			print(aa[l.id], re.match(aa[l.id], z.effective_numberings[a.id].format(level_indexes={k: k+1 for k in range(l.id+1)})) if aa[l.id] is not None else None)
-	# 			print()
-			
+	x = AbstractDocx.read(file_path=f"test/{test_files[1]}.docx")
 	
