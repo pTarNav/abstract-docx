@@ -43,7 +43,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	@staticmethod
 	def _check_discovered(id: int | str, effective_discovered_numberings: dict[int | str, Numbering]) -> Optional[Numbering]:
 		return effective_discovered_numberings.get(id, None)
-	
 		
 	def aggregate_effective_numberings(self, agg_numbering: Numbering, add_numbering: Numbering) -> Numbering:
 		effective_default_style: Style = self.effective_styles_from_ooxml.get_default()
@@ -68,7 +67,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					)
 				)
 			)
-				
+
 		return Numbering(id=add_numbering.id, levels=levels)
 	
 	def merge_into_effective_numbering_style(
@@ -153,7 +152,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		) -> None:
 		# TODO: maybe divide this function into several chunks, it is too long for sure-
 
-		# Keeps track whether it is the end of the recursion, if it is it must default
+		# Keeps track whether it is the end of the recursion, if it is, it must default
 		must_default = True
 
 		visited_ooxml_abstract_numberings.append(ooxml_abstract_numbering.id)

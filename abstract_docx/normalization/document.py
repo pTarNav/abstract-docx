@@ -10,6 +10,7 @@ from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink
 
 import ooxml_docx.document.run as OOXML_RUN
 from abstract_docx.views.format import Format
+from abstract_docx.views.format.numberings import Level, Numbering
 
 from ooxml_docx.structure.document import OoxmlDocument
 from utils.pydantic import ArbitraryBaseModel
@@ -93,6 +94,27 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		
 		return effective_texts
 	
+	def possible_numberings_and_levels_detection(
+			self, effective_paragraph_content: list[Text], effective_numberings: dict[int, Numbering]
+		) -> Optional[dict[int, dict[str, list[Level]]] | tuple[int, Level]]:
+		# Join all the text inside the paragraph content (keeping only the style of the first element).
+		# This is to avoid false negatives in the level detection.
+		x: Text = Text(text="".join([t.text for t in effective_paragraph_content]), style=effective_paragraph_content[0].style)
+
+		matches: dict[int, dict[str, list[Level]]] = {}
+		for effective_numbering in effective_numberings.values():
+			effective_numbering_matches: dict[str, list[Level]] = effective_numbering.detect(text=x)
+			if sum([len(v) for v in effective_numbering_matches.values()]) > 0:  # Not empty
+				matches[effective_numbering.id] = effective_numbering_matches
+		
+		# No matches detected
+		if sum([sum([len(v2) for v2 in v1.values()]) for v1 in matches.values()]) == 0:
+			return None
+		# One match detected
+		if sum([sum([len(v2) for v2 in v1.values()]) for v1 in matches.values()]) == 1:
+			return None # TODO return match
+		return matches
+
 	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
 		if ooxml_paragraph.properties is not None:
 			effective_paragraph_style: Style = Style(
@@ -120,11 +142,61 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		effective_paragraph_content: list[Text] = self._compute_effective_texts(
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
+
+		# TODO Look for any style - numbering association
+		
+		effective_numbering: Optional[Numbering] = None
+		effective_level: Optional[Level] = None
+		possible_numbering_and_level_matches: Optional[dict[int, dict[str, list[Level]]] | tuple[int, Level]] = None
+		if len(effective_paragraph_content) > 0:
+			if ooxml_paragraph.numbering is not None:
+				print("BY NUMBERING")
+				print(ooxml_paragraph.numbering.id, ooxml_paragraph.indentation_level)
+				effective_numbering: Numbering = self.effective_numberings_from_ooxml.effective_numberings[
+					ooxml_paragraph.numbering.id
+				]
+				if ooxml_paragraph.indentation_level not in effective_numbering.levels.keys():
+					raise ValueError("") # TODO
+				effective_level: Level = effective_numbering.levels[ooxml_paragraph.indentation_level]
+			# elif ooxml_paragraph.style is not None and ooxml_paragraph.style.numbering is not None:
+				# TODO: Think about how the numbering - style association should be treated after normalization
+				# TODO: For now just ignore, because the paragraph will always contain the numbering if it does through style anyway (this might change)
+				# print("BY STYLE NUMBERING")
+				# print(ooxml_paragraph.style.numbering.id)
+				# print(ooxml_paragraph.numbering, ooxml_paragraph.indentation_level)
+				
+				# effective_numbering: Numbering = self.effective_numberings_from_ooxml.effective_numberings[
+				# 	ooxml_paragraph.style.numbering.id
+				# ]
+				# if ooxml_paragraph.style.indentation_level not in effective_numbering.levels.keys():
+				# 	raise ValueError("") # TODO
+				# effective_level: Level = effective_numbering.levels[ooxml_paragraph.indentation_level]
+			else:
+				print("BY NUMBERING DETECTION")
+				matches: Optional[dict[int, dict[str, list[Level]]] | tuple[int, Level]] = self.possible_numberings_and_levels_detection(
+					effective_paragraph_content=effective_paragraph_content,
+					effective_numberings=self.effective_numberings_from_ooxml.effective_numberings
+				)
+				
+				# Possible outcomes and meanings:
+				# - If no matches are detected then the paragraph is certain to not have any numbering associated.				
+				# - If there is only 1 match detected it means that there is no uncertainty that it is associated.
+				# - If there is more than 1 match, cannot do any decision with certainty.
+				if matches is not None:
+					if isinstance(matches, tuple):
+						effective_numbering: Numbering = self.effective_numberings_from_ooxml.effective_numberings[matches[0]]
+						effective_level: Level = matches[1]
+					else:
+						possible_numbering_and_level_matches = matches
+
 		effective_paragraph: Paragraph = Paragraph(
 			id=block_id,
 			content=effective_paragraph_content,
-			format=Format(style=effective_paragraph_style)
+			format=Format(style=effective_paragraph_style, numbering=effective_numbering, level=effective_level)
 		)
+		print()
+		print(effective_paragraph)
+		print("possible numbering and level matches", possible_numbering_and_level_matches)
 		self.effective_document[block_id] = effective_paragraph
 
 	def _compute_effective_blocks(self) -> None:
@@ -158,7 +230,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			if isinstance(effective_block, Paragraph):
 				self._associate_effective_text_styles(effective_texts=effective_block.content)
 
-	
 	def _associate_effective_text_styles(self, effective_texts: list[Text]) -> None:
 		# TODO: Optimize this loop so the inner effective styles loop is only done once
 		for effective_text in effective_texts:

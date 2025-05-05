@@ -10,10 +10,9 @@ import roman
 from utils.pydantic import ArbitraryBaseModel
 
 import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
-
+from functools import cached_property
 
 from abstract_docx.views.format.styles import Style, RunStyleProperties, ParagraphStyleProperties
-
 
 class MarkerPattern(str):
 
@@ -132,6 +131,31 @@ class MarkerType(Enum):
 				return roman.toRoman(index).lower()
 			case MarkerType.UPPER_ROMAN:
 				return roman.toRoman(index).upper()
+	
+	def detection_regex(self) -> Optional[str]:
+		match self:
+			case MarkerType.NONE:
+				return None
+			case MarkerType.BULLET:
+				return r"·"
+			case MarkerType.DECIMAL:
+				return r"\d+"
+			case MarkerType.DECIMAL_LEADING_ZERO:
+				return r"[[0\d]|[\d{2,}]]"  # TODO, the regex match grouping here is strange e.g "02" -> detects -> 0 only 
+			case MarkerType.DECIMAL_ENCLOSED_CIRCLE:
+				return r"[\u2460-\u2473]"
+			case MarkerType.CARDINAL | MarkerType.ORDINAL:
+				#TODO: this wont cut it
+				return r"[A-Za-z]+"
+			case MarkerType.LOWER_LETTER:
+				return r"[a-z]+"
+			case MarkerType.UPPER_LETTER:
+				return r"[A-Z]+"
+			case MarkerType.LOWER_ROMAN:
+				return r"[ivxlcdm]+"
+			case MarkerType.UPPER_ROMAN:
+				return r"[IVXLCDM]+"
+
 
 class Whitespace(Enum):
 	NONE = "none"
@@ -152,6 +176,15 @@ class Whitespace(Enum):
 			"space": cls.SPACE,
 			"tab": cls.TAB,
 		}.get(v, cls.default())
+	
+	def detection_regex(self) -> str:
+		match self:
+			case Whitespace.NONE:
+				return r""
+			case Whitespace.SPACE:
+				return r" {1,2}"
+			case Whitespace.TAB:
+				return r"(?:\t| {3,})"
 
 
 class Start(int):
@@ -240,7 +273,7 @@ class LevelProperties(ArbitraryBaseModel):
 		match agg is not None, add is not None:
 			case True, True:
 				return cls(
-					marker_patter=add.marker_pattern if add.marker_pattern is not None else agg.marker_pattern,
+					marker_pattern=add.marker_pattern if add.marker_pattern is not None else agg.marker_pattern,
 					marker_type=add.marker_type if add.marker_type is not None else agg.marker_type,
 					whitespace=add.whitespace if add.whitespace is not None else agg.whitespace,
 					start=add.start if add.start is not None else agg.start,
@@ -262,6 +295,7 @@ class Level(ArbitraryBaseModel):
 	properties: LevelProperties
 	style: Style
 
+
 class Numbering(ArbitraryBaseModel):
 	id: int
 
@@ -279,5 +313,63 @@ class Numbering(ArbitraryBaseModel):
 			level_strings[k] = self.levels[k].properties.marker_type.format(index=v)
 		
 		return self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+	
+	@cached_property
+	def detection_regexes(self) -> dict[int, Optional[re.Pattern]]:
+		level_indexes_regexes: dict[int, re.Pattern] = {}
+		level_regexes: dict[int, Optional[re.Pattern]] = {}
+		for k, v in self.levels.items():
+			level_indexes_regexes[k] = v.properties.marker_type.detection_regex()
+
+			if (
+				v.properties.marker_pattern is not None
+				 and v.properties.marker_type is not None
+				 and v.properties.whitespace is not None
+			):
+				if v.properties.marker_pattern != "":
+					marker_template_escaped = re.escape(v.properties.marker_pattern)
+					print(marker_template_escaped)
+					_marker_templated_escaped = marker_template_escaped
+					for _k in range(0, k+1):
+						if level_indexes_regexes[_k] is not None:
+							marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"(?:{level_indexes_regexes[_k]})")	
+
+					if marker_template_escaped != _marker_templated_escaped:
+						level_regexes[k] = rf"^{marker_template_escaped}{v.properties.whitespace.detection_regex()}"
+						print(level_regexes[k])
+					else:
+						level_regexes[k] = None
+				else:
+					level_regexes[k] = None
+			else:
+				raise ValueError("Cannot build detection regex with empty level properties.")
+
+		print(level_regexes)
+		return level_regexes
+
+	def detect(self, text: "Text") -> dict[str, list[Level]]:  # Type hint as string to avoid circular import hell
+		matches: dict[str, list[Level]] = {
+			"regex_and_style": [],
+			"regex_and_run_style_properties": [],
+			"regex_and_paragraph_style_properties": [],
+			"regex_only": []
+		}
+		
+		detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes
+		for level_id, level in self.levels.items():
+			if detection_regexes[level_id] is not None:		
+				match = re.match(self.detection_regexes[level_id], text.text)
+				if match is not None:
+					if level.style == text.style:
+						matches["regex_and_style"].append(level)
+					else:
+						if level.style.properties.run_style_properties == text.style.properties.run_style_properties:
+							matches["regex_and_run_style_properties"].append(level)
+						elif level.style.properties.paragraph_style_properties == text.style.properties.paragraph_style_properties:
+							matches["regex_and_paragraph_style_properties"].append(level)
+						else:
+							matches["regex_only"].append(level)
+		
+		return matches
 		
 		

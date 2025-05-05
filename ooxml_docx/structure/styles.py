@@ -136,6 +136,7 @@ class ParagraphStyle(Style):
 	linked_run_style: Optional[RunStyle] = None  # Assumption: Only one run style can be linked
 
 	numbering: Optional["Numbering"] = None  # To avoid circular import hell
+	indentation_level: Optional[int] = None
 
 	@classmethod
 	def parse(cls, ooxml_style: OoxmlElement) -> ParagraphStyle:

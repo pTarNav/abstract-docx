@@ -22,7 +22,8 @@ class NumberingStyle(_NumberingStyle):
 	abstract_numbering_children: Optional[list[AbstractNumbering]] = None  # w:numStyleLink
 
 	numbering: Optional[Numbering] = None
-	
+	indentation_level: Optional[int] = None
+
 	# @classmethod
 	# def load_from_incomplete(cls, incomplete_numbering_style: _NumberingStyle) -> NumberingStyle:
 	# 	# ! This is the most straightforward solution I have been able to find so far...
@@ -393,8 +394,12 @@ class Numbering(OoxmlElement):
 	
 	def find_style_level(self, style: ParagraphStyle | NumberingStyle) -> int:
 		"""_summary_
-
-		Assumption
+		There are 3 cases when parsing the indentation level (ordered by priority):
+		 - The indentation level is explicit, by stating the indentation level in the numbering properties.
+		 (Even though the OOXML documentation says it should never happen, in practice it does, therefore,
+		 the assumption is made that if the indentation level is explicitly stated, it should take preference)
+		 - The indentation level is implicit, by referencing the style inside the respective level.
+		 - Lowest indentation level assumption, so there can never be an empty indentation level.
 		:param numbering_style: _description_
 		:raises ValueError: _description_
 		:return: _description_
@@ -415,7 +420,7 @@ class Numbering(OoxmlElement):
 		#  do not go down the chain of style and abstract numbering hierarchy.
 		# ! Might be needed to change in the future if the assumption is not correct...
 		for i, level in self.abstract_numbering.levels.items():
-			if level.style.id == style.id:
+			if level.style is not None and level.style.id == style.id:
 				return i
 		
 		# In some cases (because of ooxml manipulation from external programs),	
@@ -519,9 +524,14 @@ class OoxmlNumberings(ArbitraryBaseModel):
 					case _:
 						raise ValueError("WTF are you doing")  # TODO
 				
-				numbering: Optional[Numbering] = self.find(id=int(numbering_id)) if numbering_id is not None else None
+				if numbering_id is not None:
+					numbering_id = int(numbering_id)
+				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
+				
 				if numbering is not None:
 					style.numbering = numbering
+					style.indentation_level = numbering.find_style_level(style=style)
+
 				elif numbering_id is not None:
 					# In some cases (because of ooxml manipulation from external programs),
 					#  there is a numbering reference to an inexistent numbering instance.
@@ -529,7 +539,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 					# Raises a warning instead of an error and proceeds.
 					print(
 						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
-					)
+					)			
 
 			if style.children is not None:
 				self.associate_styles_and_numberings(styles=style.children, style_type=style_type)
