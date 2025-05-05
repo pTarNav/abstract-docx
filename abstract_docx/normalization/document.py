@@ -194,9 +194,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			content=effective_paragraph_content,
 			format=Format(style=effective_paragraph_style, numbering=effective_numbering, level=effective_level)
 		)
-		print()
-		print(effective_paragraph)
-		print("possible numbering and level matches", possible_numbering_and_level_matches)
+		# print()
+		# print(effective_paragraph)
+		# print("possible numbering and level matches", possible_numbering_and_level_matches)
 		self.effective_document[block_id] = effective_paragraph
 
 	def _compute_effective_blocks(self) -> None:
