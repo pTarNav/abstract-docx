@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum
 
 from colour import Color
@@ -353,6 +353,7 @@ class StyleProperties(ArbitraryBaseModel):
 	 - justification:
 	 - indentation:
 	TODO: Expand properties
+	!!!! TODO: Paragraph properties can also contain run properties, need to take this into account !!!!
 	"""
 	run_style_properties: RunStyleProperties
 	paragraph_style_properties: ParagraphStyleProperties
@@ -399,3 +400,8 @@ class Style(ArbitraryBaseModel):
 	children: Optional[list[Style]] = None
 
 	properties: StyleProperties
+
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Style):
+			return self.properties == v.properties
+		return None

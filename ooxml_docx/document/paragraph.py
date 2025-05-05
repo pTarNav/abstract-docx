@@ -262,14 +262,17 @@ class Paragraph(OoxmlElement):
 			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 			if indentation_level is None:
 				# Defaults to the lowest one specified inside the numbering definition
-				indentation_level = 0  # TODO: check if this can be anything besides 0	
+				indentation_level = 0  # TODO: check if this can be anything besides 0
+				print(f"\033[33m[Warning] Lowest indentation level assumption for a paragraph.\033[0m")
 			indentation_level = int(indentation_level)
 
 			return numbering, indentation_level
 		
+		# TODO: Think about if this is necessary, or will it always be better to check numbering through style?
+		# TODO: if the latter is decided, need to check the processes that treat numbering afterwards (mainly abstract_docx normalization)
 		# Case: Numbering properties via numbering style or paragraph style
 		if style is not None and style.numbering is not None:
-			return style.numbering, style.numbering.find_style_level(style=style)
+			return style.numbering, style.indentation_level
 
 		return None
 

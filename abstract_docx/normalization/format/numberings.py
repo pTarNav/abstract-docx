@@ -5,7 +5,8 @@ import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.numberings import Numbering, LevelProperties
+from abstract_docx.views.format.numberings import Numbering, LevelProperties, Level
+from abstract_docx.views.format.styles import Style, StyleProperties
 
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 
@@ -20,7 +21,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	ooxml_numberings: OoxmlNumberings
 	effective_numberings: dict[int, Numbering]
 
-	effective_styles: EffectiveStylesFromOoxml
+	effective_styles_from_ooxml: EffectiveStylesFromOoxml
 
 	# Auxiliary data for intermediate steps
 	_discovered_effective_abstract_numberings: dict[int, Numbering] = {}
@@ -29,33 +30,45 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 	@classmethod
 	def normalization(
-			cls, ooxml_numberings: OoxmlNumberings, effective_styles: EffectiveStylesFromOoxml
+			cls, ooxml_numberings: OoxmlNumberings, effective_styles_from_ooxml: EffectiveStylesFromOoxml
 		) -> EffectiveNumberingsFromOoxml:
 		
 		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml = cls(
-			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles=effective_styles
+			ooxml_numberings=ooxml_numberings, effective_numberings={}, effective_styles_from_ooxml=effective_styles_from_ooxml
 		)
-		effective_numberings_from_ooxml.load_effective_numberings()
+		effective_numberings_from_ooxml.load()
 
 		return effective_numberings_from_ooxml
 
 	@staticmethod
 	def _check_discovered(id: int | str, effective_discovered_numberings: dict[int | str, Numbering]) -> Optional[Numbering]:
 		return effective_discovered_numberings.get(id, None)
-	
 		
 	def aggregate_effective_numberings(self, agg_numbering: Numbering, add_numbering: Numbering) -> Numbering:
-		return Numbering(
-			id=add_numbering.id,
-			levels={
-				i: LevelProperties.aggregate_ooxml(
-					agg=agg_numbering.levels.get(i, None),
-					add=add_numbering.levels.get(i, None),
-					default_style=self.effective_styles.effective_styles["__DocDefaults__"]
+		effective_default_style: Style = self.effective_styles_from_ooxml.get_default()
+
+		levels: dict[int, Level] = {}
+		for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys())):
+			agg_level: Optional[Level] = agg_numbering.levels.get(i, None)
+			add_level: Optional[Level] = add_numbering.levels.get(i, None)
+
+			levels[i] = Level(
+				id=i,
+				properties=LevelProperties.aggregate_ooxml(
+					agg=agg_level.properties if agg_level is not None else None,
+					add=add_level.properties if add_level is not None else None
+				),
+				style=Style(
+					id=add_level.style.id if add_level is not None else agg_level.style.id,
+					properties=StyleProperties.aggregate_ooxml(
+						agg=agg_level.style.properties if agg_level is not None else effective_default_style.properties,
+						add=add_level.style.properties if add_level is not None else effective_default_style.properties,
+						default=effective_default_style.properties
+					)
 				)
-				for i in set(list(agg_numbering.levels.keys()) + list(add_numbering.levels.keys()))
-			}
-		)
+			)
+
+		return Numbering(id=add_numbering.id, levels=levels)
 	
 	def merge_into_effective_numbering_style(
 			self, effective_numbering: Optional[Numbering], effective_abstract_numbering: Optional[Numbering]
@@ -74,6 +87,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings: list[int],
 			visited_ooxml_abstract_numberings: list[int]
 		) -> Optional[Numbering]:
+		# TODO: maybe divide this function into several chunks, it is too long for sure-
 		effective_numbering: Optional[Numbering] = None
 		effective_abstract_numbering: Optional[Numbering] = None
 
@@ -136,7 +150,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings: list[int],
 			visited_ooxml_abstract_numberings: list[int]
 		) -> None:
-		# Keeps track whether it is the end of the recursion, if it is it must default
+		# TODO: maybe divide this function into several chunks, it is too long for sure-
+
+		# Keeps track whether it is the end of the recursion, if it is, it must default
 		must_default = True
 
 		visited_ooxml_abstract_numberings.append(ooxml_abstract_numbering.id)
@@ -171,7 +187,18 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			effective_abstract_numbering: Numbering	= Numbering(
 				id=ooxml_abstract_numbering.id,
 				levels={
-					k: LevelProperties.from_ooxml(level=v, must_default=must_default)
+					k: Level(
+						id=k,
+						properties=LevelProperties.from_ooxml(level=v, must_default=must_default),
+						style=Style(
+							id=f"__@ABSTRACT_NUMBERING={ooxml_abstract_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
+							properties=StyleProperties.from_ooxml(
+								run_properties=v.run_properties,
+								paragraph_properties=v.paragraph_properties,
+								must_default=must_default
+							)
+						)
+					)
 					for k, v in ooxml_abstract_numbering.levels.items()
 				}
 			)
@@ -191,7 +218,18 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			effective_numbering: Numbering = Numbering(
 				id=ooxml_numbering.id,
 				levels={
-					k: LevelProperties.from_ooxml(level=v.level, must_default=must_default)
+					k: Level(
+						id=k,
+						properties=LevelProperties.from_ooxml(level=v, must_default=must_default),
+						style=Style(
+							id=f"__@NUMBERING={ooxml_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
+							properties=StyleProperties.from_ooxml(
+								run_properties=v.level.run_properties if v.level is not None else None,
+								paragraph_properties=v.level.paragraph_properties if v.level is not None else None,
+								must_default=must_default
+							)
+						)
+					)
 					for k, v in ooxml_numbering.overrides.items()
 				}
 			)
@@ -216,9 +254,24 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_abstract_numberings=[]
 				)
 
-	def load_effective_numberings(self) -> None:
+	def _associate_effective_numbering_styles(self) -> None:
+		"""_summary_
+		"""
+		# TODO: Optimize this loop so the inner effective styles loop is only done once
+		for effective_numbering in self.effective_numberings.values():
+			for effective_level in effective_numbering.levels.values():
+				found_effective_style_match: bool = False
+				for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
+					if effective_level.style == effective_style:
+						effective_level.style = effective_style
+						found_effective_style_match = True
+						break
+				
+				if not found_effective_style_match:
+					self.effective_styles_from_ooxml.effective_styles[effective_level.style.id] = effective_level.style
+
+	def load(self) -> None:
 		"""
 		"""
 		self._compute_effective_numberings()
-		
-		
+		self._associate_effective_numbering_styles()

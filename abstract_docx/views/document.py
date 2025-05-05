@@ -4,11 +4,32 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.views.format import Format
+from abstract_docx.views.format.styles import Style
 
+import ooxml_docx.document.run as OOXML_RUN
 
 class Text(ArbitraryBaseModel):
 	text: str
-	# TODO: Text (run formatting)
+	style: Style
+
+	@classmethod
+	def from_ooxml(cls, ooxml_run: OOXML_RUN.Run, style: Style) -> Text:
+		return cls(
+			text="".join([run_content.text for run_content in ooxml_run.content]),
+			style=style
+		)
+	
+	def concat(self, other: Text) -> None:
+		if self.style != other.style:
+			raise ValueError("Cannot concatenate two Texts that do not share the same style properties.")
+
+		self.text += other.text
+	
+class Run(Text):
+	pass
+
+class Hyperlink(Text):
+	target: str
 
 
 class Block(ArbitraryBaseModel):
@@ -20,4 +41,8 @@ class Block(ArbitraryBaseModel):
 
 
 class Paragraph(Block):
-	text: list[Text]
+	content: list[Text]
+
+	def __str__(self):
+		return "".join([content.text for content in self.content])
+	
