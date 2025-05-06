@@ -51,9 +51,9 @@ class AbstractDocx(ArbitraryBaseModel):
 			if isinstance(p, Paragraph):
 				for i, pl in enumerate(order_styles):
 					if p.format.style in pl:
-						print(f"[{i}]", "#"*i, p)
+						print(f"[{i} {p.format.style.id}]")
+						print("##"*i, p)
 						break
-		# TODO: wtf is happening with test[0] and test[2] and test[3] (seems something to do about paragraphs with correct numberings)
 
 	def __call__(self, *args, **kwds) -> None:
 		"""
@@ -66,5 +66,5 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[0]}.docx")
+	x = AbstractDocx.read(file_path=f"test/{test_files[3]}.docx")
 	x()	

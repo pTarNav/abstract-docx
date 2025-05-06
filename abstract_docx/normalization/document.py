@@ -5,7 +5,7 @@ import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
 
-from abstract_docx.views.format.styles import Style, StyleProperties
+from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
 from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink
 
 import ooxml_docx.document.run as OOXML_RUN
@@ -143,6 +143,43 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
 
+		# Check if there are run style properties shared amongst (all or in the majority) the paragraph contents.
+		# If so pull them into the paragraph style.
+		if len(effective_paragraph_content) > 0:
+			shared_text_run_style_properties: RunStyleProperties = effective_paragraph_content[0].style.properties.run_style_properties
+			for i, effective_text in enumerate(effective_paragraph_content[1:]):
+				shared_text_run_style_properties = RunStyleProperties(
+					font_size=shared_text_run_style_properties.font_size
+					if shared_text_run_style_properties.font_size == effective_text.style.properties.run_style_properties.font_size
+					else None,
+					font_color=shared_text_run_style_properties.font_color
+					if shared_text_run_style_properties.font_color == effective_text.style.properties.run_style_properties.font_color
+					else None,
+					font_script=shared_text_run_style_properties.font_script
+					if shared_text_run_style_properties.font_script == effective_text.style.properties.run_style_properties.font_script
+					else None,
+					bold=shared_text_run_style_properties.bold
+					if shared_text_run_style_properties.bold == effective_text.style.properties.run_style_properties.bold
+					else None,
+					italic=shared_text_run_style_properties.italic
+					if shared_text_run_style_properties.italic == effective_text.style.properties.run_style_properties.italic
+					else None,
+					underline=shared_text_run_style_properties.underline
+					if shared_text_run_style_properties.underline == effective_text.style.properties.run_style_properties.underline
+					else None
+				)
+			
+			# print("result", shared_text_run_style_properties)
+			# print("old", effective_paragraph_style.properties.run_style_properties)
+			# old_effective = effective_paragraph_style
+			# effective_paragraph_style.properties = effective_paragraph_style.properties.aggregate_ooxml(
+			# 	agg=effective_paragraph_style.properties,
+			# 	add=StyleProperties(
+			# 		run_style_properties=shared_text_run_style_properties, paragraph_style_properties=ParagraphStyleProperties.from_ooxml(None)
+			# 	), 
+			# 	default=self.effective_styles_from_ooxml.get_default().properties
+			# )
+			
 		# TODO Look for any style - numbering association
 		
 		effective_numbering: Optional[Numbering] = None
@@ -150,8 +187,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		possible_numbering_and_level_matches: Optional[dict[int, dict[str, list[Level]]] | tuple[int, Level]] = None
 		if len(effective_paragraph_content) > 0:
 			if ooxml_paragraph.numbering is not None:
-				print("BY NUMBERING")
-				print(ooxml_paragraph.numbering.id, ooxml_paragraph.indentation_level)
 				effective_numbering: Numbering = self.effective_numberings_from_ooxml.effective_numberings[
 					ooxml_paragraph.numbering.id
 				]
@@ -172,7 +207,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				# 	raise ValueError("") # TODO
 				# effective_level: Level = effective_numbering.levels[ooxml_paragraph.indentation_level]
 			else:
-				print("BY NUMBERING DETECTION")
 				matches: Optional[dict[int, dict[str, list[Level]]] | tuple[int, Level]] = self.possible_numberings_and_levels_detection(
 					effective_paragraph_content=effective_paragraph_content,
 					effective_numberings=self.effective_numberings_from_ooxml.effective_numberings
@@ -197,7 +231,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# print()
 		# print(effective_paragraph)
 		# print("possible numbering and level matches", possible_numbering_and_level_matches)
+		print(effective_paragraph)
 		self.effective_document[block_id] = effective_paragraph
+		print()
 
 	def _compute_effective_blocks(self) -> None:
 		"""

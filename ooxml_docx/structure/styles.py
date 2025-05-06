@@ -146,7 +146,7 @@ class ParagraphStyle(Style):
 		:return: _description_
 		"""
 		ooxml_properties: Optional[OoxmlElement] = ooxml_style.xpath_query(query="./w:pPr", singleton=True)
-		ooxml_run_properties: Optional[OoxmlElement] = ooxml_style.xpath_query(query="./rPr", singleton=True)
+		ooxml_run_properties: Optional[OoxmlElement] = ooxml_style.xpath_query(query="./w:rPr", singleton=True)
 
 		return cls(
 			**Style.parse(ooxml_style=ooxml_style).model_dump(),

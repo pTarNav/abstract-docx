@@ -82,18 +82,16 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml):
 		if len(ordered_styles) == 0:
 			ordered_styles.append([effective_style])
 		else:
-			print("#"*42)
 			for i, priority_level in enumerate(ordered_styles):
 				priority_difference: int = compute_priority_difference(
 					styles_priority_parameters=styles_priority_parameters,
 					style=effective_style,
 					priority_level_representative=priority_level[0]
 				)
-
 				match priority_difference:
 					case -1:
 						# Continue searching for equal or lower priority level (if possible)
-						if i == len(ordered_styles):
+						if i == len(ordered_styles) - 1:
 							ordered_styles.append([effective_style])
 					case 0:
 						# Insert style into the current priority level (and stop search)
@@ -103,7 +101,7 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml):
 						# Insert style one priority level above of the current priority level (and stop search)
 						ordered_styles.insert(i, [effective_style])
 						break
-	
+				
 	for i, priority_level in enumerate(ordered_styles):
 		print("##################", i, len(priority_level))
 		print([s.id for s in priority_level])
