@@ -8,6 +8,7 @@ from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.views import AbstractDocxViews
 from abstract_docx.views.document import Paragraph
+from abstract_docx.views.format import StylesView
 
 from abstract_docx.hierarchization.format.styles import styles_hierarchization
 
@@ -45,15 +46,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		raise ValueError("Please call")
 
 	def hierarchization(self) -> None:
-		order_styles = styles_hierarchization(effective_styles=self._effective_structure.styles.effective_styles)
-
-		for p in self._effective_structure.document.effective_document.values():
-			if isinstance(p, Paragraph):
-				for i, pl in enumerate(order_styles):
-					if p.format.style in pl:
-						print(f"[{i} {p.format.style.id}]")
-						print("##"*i, p)
-						break
+		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles.effective_styles)
 
 	def __call__(self, *args, **kwds) -> None:
 		"""

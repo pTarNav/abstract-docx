@@ -13,6 +13,8 @@ class Format(ArbitraryBaseModel):
 	level: Optional[Level] = None
 
 
-class AbstractDocxFormatViews(ArbitraryBaseModel):
-	styles: dict[str, Style]
+StylesView = dict[int, dict[str, Style]] 
+
+class FormatsView(ArbitraryBaseModel):
+	styles: StylesView
 	numberings: dict[int, Numbering]

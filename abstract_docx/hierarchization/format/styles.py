@@ -3,6 +3,7 @@ from enum import Enum
 from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.views.format.styles import Style
+from abstract_docx.views.format import StylesView
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 
 class AvailableStylePriorityParameters(Enum):
@@ -70,13 +71,11 @@ def compute_priority_difference(styles_priority_parameters: StylesPriorityParame
 	return 0
 				
 
-def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml):
+def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml) -> StylesView:
 	priorities = [AvailableStylePriorityParameters.FONT_SIZE, AvailableStylePriorityParameters.INDENTATION, AvailableStylePriorityParameters.BOLD]
 	styles_priority_parameters: StylesPriorityParameters = StylesPriorityParameters.load(priorities=priorities)
 
 	ordered_styles: list[list[Style]] = []
-	# key: priority level representative 
-	# values: styles that conform to said representative
 
 	for effective_style in effective_styles.values():
 		if len(ordered_styles) == 0:
@@ -102,6 +101,6 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml):
 						ordered_styles.insert(i, [effective_style])
 						break
 	
-	return ordered_styles
+	return {priority_level: styles for priority_level, styles in enumerate(ordered_styles)}
 
 	
