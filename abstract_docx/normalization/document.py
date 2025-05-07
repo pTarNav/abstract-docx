@@ -143,6 +143,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
 
+		# TODO: put this logic inside the style properties interface
 		# Check if there are run style properties shared amongst (all or in the majority) the paragraph contents.
 		# If so pull them into the paragraph style.
 		if len(effective_paragraph_content) > 0:
@@ -169,17 +170,23 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					else None
 				)
 			
-			# print("result", shared_text_run_style_properties)
-			# print("old", effective_paragraph_style.properties.run_style_properties)
-			# old_effective = effective_paragraph_style
-			# effective_paragraph_style.properties = effective_paragraph_style.properties.aggregate_ooxml(
-			# 	agg=effective_paragraph_style.properties,
-			# 	add=StyleProperties(
-			# 		run_style_properties=shared_text_run_style_properties, paragraph_style_properties=ParagraphStyleProperties.from_ooxml(None)
-			# 	), 
-			# 	default=self.effective_styles_from_ooxml.get_default().properties
-			# )
-			
+			if shared_text_run_style_properties != effective_paragraph_style.properties.run_style_properties:
+				effective_paragraph_style.properties = StyleProperties.aggregate_ooxml(
+					agg=effective_paragraph_style.properties,
+					add=StyleProperties(
+						run_style_properties=shared_text_run_style_properties,
+						paragraph_style_properties=effective_paragraph_style.properties.paragraph_style_properties
+					), 
+					default=self.effective_styles_from_ooxml.get_default().properties
+				)
+		
+		# TODO: Check if there is whitespace in front of the paragraph contents
+		# Cases:
+		#  - Paragraph occupies just 1 line: The whitespace is pulled into the start indentation.
+		#  - Paragraph occupies more than just 1 line:
+		#  		- Whitespace detected only at the beginning: The whitespace is pulled into the first indentation.
+		#  		- Whitespace detected repeatedly for each line: The whitespace is pulled into the start indentation.
+
 		# TODO Look for any style - numbering association
 		
 		effective_numbering: Optional[Numbering] = None
