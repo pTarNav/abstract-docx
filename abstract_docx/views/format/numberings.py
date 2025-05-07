@@ -328,7 +328,6 @@ class Numbering(ArbitraryBaseModel):
 			):
 				if v.properties.marker_pattern != "":
 					marker_template_escaped = re.escape(v.properties.marker_pattern)
-					print(marker_template_escaped)
 					_marker_templated_escaped = marker_template_escaped
 					for _k in range(0, k+1):
 						if level_indexes_regexes[_k] is not None:
@@ -336,7 +335,6 @@ class Numbering(ArbitraryBaseModel):
 
 					if marker_template_escaped != _marker_templated_escaped:
 						level_regexes[k] = rf"^{marker_template_escaped}{v.properties.whitespace.detection_regex()}"
-						print(level_regexes[k])
 					else:
 						level_regexes[k] = None
 				else:
@@ -344,7 +342,6 @@ class Numbering(ArbitraryBaseModel):
 			else:
 				raise ValueError("Cannot build detection regex with empty level properties.")
 
-		print(level_regexes)
 		return level_regexes
 
 	def detect(self, text: "Text") -> dict[str, list[Level]]:  # Type hint as string to avoid circular import hell

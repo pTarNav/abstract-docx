@@ -76,7 +76,7 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 			agg_style=agg_effective_style,
 			add_style=Style(id=ooxml_style.id, properties=other_shallow_effective_style_properties),
 			default_style=self.effective_styles["__DocDefaults__"]
-		)
+		)	
 
 		match type(ooxml_style):
 			case OOXML_STYLES.RunStyle:
