@@ -307,6 +307,17 @@ class Numbering(OoxmlElement):
 	abstract_numbering: AbstractNumbering
 	overrides: dict[int, LevelOverride] = {}
 
+	def _associate_abstract_numbering(self) -> None:
+		"""Associates the numbering to its abstract numbering."""
+		if self.abstract_numbering.numberings is None:
+			self.abstract_numbering.numberings = []
+		self.abstract_numbering.numberings.append(self)
+
+	def _associate_overrides(self) -> None:
+		"""Associates the numbering to each one of its overrides."""
+		for override in self.overrides.values():
+			override.numbering = self
+
 	@classmethod
 	def parse(
 		cls, ooxml_numbering: OoxmlElement, abstract_numberings: list[AbstractNumbering], styles: OoxmlStyles
@@ -329,14 +340,8 @@ class Numbering(OoxmlElement):
 			)
 		)
 
-		# TODO: Encapsulate this part into a self function
-		#
-		if numbering.abstract_numbering.numberings is None:
-			numbering.abstract_numbering.numberings = []
-		numbering.abstract_numbering.numberings.append(numbering)
-		#
-		for override in numbering.overrides.values():
-			override.numbering = numbering
+		numbering._associate_abstract_numbering()
+		numbering._associate_overrides()
 
 		return numbering
 	
