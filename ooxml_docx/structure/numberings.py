@@ -97,7 +97,7 @@ class Level(OoxmlElement):
 		if paragraph_style_search_result is not None:
 			return paragraph_style_search_result
 		
-		raise ValueError("")  # TODO
+		raise KeyError(f"Inexistent style referenced: {style_id=}.")
 
 	def __str__(self) -> str:
 		return f"[bold]{self.id}[/bold]: '{self.style.id if self.style is not None else ''}'"
