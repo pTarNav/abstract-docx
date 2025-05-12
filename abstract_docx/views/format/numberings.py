@@ -264,8 +264,10 @@ class LevelProperties(ArbitraryBaseModel):
 			)
 
 		if must_default:
+			print(None, "defaulted")
 			return cls.default()
 		
+		print(None, None)
 		return cls()
 
 	@classmethod

@@ -238,9 +238,8 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# print()
 		# print(effective_paragraph)
 		# print("possible numbering and level matches", possible_numbering_and_level_matches)
-		print(effective_paragraph)
+
 		self.effective_document[block_id] = effective_paragraph
-		print()
 
 	def _compute_effective_blocks(self) -> None:
 		"""

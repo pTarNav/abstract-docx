@@ -72,7 +72,7 @@ def compute_priority_difference(styles_priority_parameters: StylesPriorityParame
 				
 
 def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml) -> StylesView:
-	priorities = [AvailableStylePriorityParameters.FONT_SIZE, AvailableStylePriorityParameters.INDENTATION, AvailableStylePriorityParameters.BOLD]
+	priorities = [AvailableStylePriorityParameters.FONT_SIZE, AvailableStylePriorityParameters.BOLD, AvailableStylePriorityParameters.INDENTATION]
 	styles_priority_parameters: StylesPriorityParameters = StylesPriorityParameters.load(priorities=priorities)
 
 	ordered_styles: list[list[Style]] = []
@@ -101,6 +101,6 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml) -> Styles
 						ordered_styles.insert(i, [effective_style])
 						break
 	
-	return {priority_level: styles for priority_level, styles in enumerate(ordered_styles)}
+	return StylesView.load(styles=effective_styles, ordered_styles=ordered_styles)
 
 	
