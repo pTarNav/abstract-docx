@@ -56,7 +56,7 @@ class OoxmlDocx(ArbitraryBaseModel):
 			# Read the .docx file as a .zip and crawl through the contents
 			with zipfile.ZipFile(BytesIO(f.read())) as zip_ref:
 				for f_name in zip_ref.namelist():
-					# TODO: handle other file extensions inside the package
+					# ! TODO: Handle other file extensions inside the package
 					if f_name.endswith(".xml") or f_name.endswith(".rels"):
 						contents[f_name] = zip_ref.read(f_name)
 		

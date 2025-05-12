@@ -82,7 +82,7 @@ class OoxmlElement(ArbitraryBaseModel):
 		
 		return self.element.nsmap
 
-	# TODO: maybe to not have to do this weird casting thing for attributes create wrapper function to access attributes
+	# ! TODO: Refine attributes type casting wrapper
 	def _cast_xpath_query_result(self, query_result_element: Any) -> XpathQueryResult:
 		"""
 		Cast xpath query result to the appropriate OoxmlElement class if eligible.

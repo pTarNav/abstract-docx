@@ -75,7 +75,7 @@ class OoxmlDocument(OoxmlElement):
 				case "tbl":
 					element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles, relationships=relationships)
 				case _:
-					# ! TODO: remove continue
+					# ! TODO: Remove continue
 					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
 			content.append(element)
