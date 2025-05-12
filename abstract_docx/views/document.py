@@ -34,7 +34,7 @@ class Hyperlink(Text):
 
 class Block(ArbitraryBaseModel):
 	id: int
-	format: Format
+	format: Optional[Format] = None  # Only the root block of the document will have empty format
 
 	parent: Optional[Block] = None
 	children: Optional[list[Block]] = None

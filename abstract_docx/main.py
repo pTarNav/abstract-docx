@@ -7,10 +7,10 @@ from ooxml_docx.docx import OoxmlDocx
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.views import AbstractDocxViews
-from abstract_docx.views.document import Paragraph
 from abstract_docx.views.format import StylesView
 
 from abstract_docx.hierarchization.format.styles import styles_hierarchization
+from abstract_docx.hierarchization.document import document_hierarchization
 
 class AbstractDocx(ArbitraryBaseModel):
 	"""
@@ -47,6 +47,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 	def hierarchization(self) -> None:
 		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles.effective_styles)
+		document_hierarchization(effective_document=self._effective_structure.document.effective_document, styles_view=styles_view)
 
 	def __call__(self, *args, **kwds) -> None:
 		"""
@@ -58,6 +59,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 	
 if __name__ == "__main__":
-	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[1]}.docx")
+	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
+	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
 	x()	

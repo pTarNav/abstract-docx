@@ -164,7 +164,10 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 			
 			if duplicated_in_group is not None:
 				new_group_id = f"{duplicated_in_group}&{style.id}" # TODO: what happens if for some reason there already exists a style with this id?
+				
 				groups[new_group_id] = groups.pop(duplicated_in_group)
+				groups[new_group_id].id = new_group_id
+
 				_map_effective_to_effective_deduplicated_styles[new_group_id] = (
 					_map_effective_to_effective_deduplicated_styles.pop(duplicated_in_group)
 				)

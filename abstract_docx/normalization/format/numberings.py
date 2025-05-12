@@ -103,7 +103,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 			if effective_abstract_numbering is None:
 				self.compute_effective_numbering(
-					ooxml_numbering=None,  # Only interested in computed the abstract numbering
+					ooxml_numbering=None,  # Only interested in computing the abstract numbering
 					ooxml_abstract_numbering=ooxml_style_parent.abstract_numbering_parent,
 					visited_ooxml_numberings=visited_ooxml_numberings,
 					visited_ooxml_abstract_numberings=visited_ooxml_abstract_numberings
@@ -220,7 +220,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				levels={
 					k: Level(
 						id=k,
-						properties=LevelProperties.from_ooxml(level=v, must_default=must_default),
+						properties=LevelProperties.from_ooxml(level=v.level, must_default=must_default),
 						style=Style(
 							id=f"__@NUMBERING={ooxml_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
 							properties=StyleProperties.from_ooxml(
