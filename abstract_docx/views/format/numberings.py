@@ -18,7 +18,7 @@ class MarkerPattern(str):
 
 	@classmethod
 	def default(cls) -> MarkerPattern:
-		return cls("")  # TODO: investigate further
+		return cls("")  # ! TODO: investigate further
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[MarkerPattern]:
@@ -68,6 +68,7 @@ class MarkerType(Enum):
 	DECIMAL = "decimal"
 	DECIMAL_ENCLOSED_CIRCLE = "decimal_enclosed_circle"
 	DECIMAL_LEADING_ZERO = "decimal_leading_zero"
+	DECIMAL_ORDINAL = "decimal_ordinal"
 	CARDINAL = "cardinal"
 	ORDINAL = "ordinal"
 	LOWER_LETTER = "lower_letter"
@@ -84,7 +85,7 @@ class MarkerType(Enum):
 		if not must_default and v is None:
 			return None
 		
-		# TODO: for decimalEnclosedParen, make sure to treat marker pattern aswell
+		# ! TODO: for decimalEnclosedParen, make sure to treat marker pattern aswell
 		return {
 			"none": cls.NONE,
 			"bullet": cls.BULLET,
@@ -94,6 +95,7 @@ class MarkerType(Enum):
 			"decimalEnclosedParen": cls.DECIMAL,
 			"decimalZero": cls.DECIMAL_LEADING_ZERO,
 			"cardinalText": cls.CARDINAL,
+			"ordinal": cls.DECIMAL_ORDINAL,
 			"ordinalText": cls.ORDINAL,
 			"lowerLetter": cls.LOWER_LETTER,
 			"upperLetter": cls.UPPER_LETTER,
@@ -119,10 +121,12 @@ class MarkerType(Enum):
 					return chr(code_point)
 				except ValueError:
 					return str(index)
+			case MarkerType.DECIMAL_ORDINAL:
+				return num2words(index, to="ordinal_num")
 			case MarkerType.CARDINAL:
-				return num2words(index, to='cardinal')
+				return num2words(index, to="cardinal")
 			case MarkerType.ORDINAL:
-				return num2words(index, to='ordinal')
+				return num2words(index, to="ordinal")
 			case MarkerType.LOWER_LETTER:
 				return to_letters(index).lower()
 			case MarkerType.UPPER_LETTER:
@@ -141,12 +145,33 @@ class MarkerType(Enum):
 			case MarkerType.DECIMAL:
 				return r"\d+"
 			case MarkerType.DECIMAL_LEADING_ZERO:
-				return r"[[0\d]|[\d{2,}]]"  # TODO, the regex match grouping here is strange e.g "02" -> detects -> 0 only 
+				return r"[[0\d]|[\d{2,}]]"  # ! TODO, the regex match grouping here is strange e.g "02" -> detects -> 0 only 
 			case MarkerType.DECIMAL_ENCLOSED_CIRCLE:
 				return r"[\u2460-\u2473]"
-			case MarkerType.CARDINAL | MarkerType.ORDINAL:
-				#TODO: this wont cut it
-				return r"[A-Za-z]+"
+			case MarkerType.DECIMAL_ORDINAL:
+				return r"\b\d*(?:1st|2nd|3rd|[4-9]th)\b"
+			case MarkerType.CARDINAL:
+				# ! TODO: Expand to > 100
+				return re.compile(
+					r"\b(?:"
+					r"One|Two|Three|Four|Five|Six|Seven|Eight|Nine|"
+					r"Ten|Eleven|Twelve|Thirteen|Fourteen|Fifteen|Sixteen|Seventeen|Eighteen|Nineteen|"
+					r"Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety"
+					r"(?:Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety)-"
+					r"(?:one|two|three|four|five|six|seven|eight|nine)"
+					r")\b"
+				)
+			case MarkerType.ORDINAL:
+				# ! TODO: Expand to > 100
+				return re.compile(
+					r"\b(?:"
+					r"First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|"
+					r"Tenth|Eleventh|Twelfth|Thirteenth|Fourteenth|Fifteenth|Sixteenth|Seventeenth|Eighteenth|Nineteenth|"
+					r"Twentieth|Thirtieth|Fortieth|Fiftieth|Sixtieth|Seventieth|Eightieth|Ninetieth|"
+					r"(?:Twenty|Thirty|Forty|Fifty|Sixty|Seventy|Eighty|Ninety)-"
+					r"(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)"
+					r")\b"
+				)
 			case MarkerType.LOWER_LETTER:
 				return r"[a-z]+"
 			case MarkerType.UPPER_LETTER:

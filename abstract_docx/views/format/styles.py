@@ -13,7 +13,7 @@ import ooxml_docx.structure.properties as OOXML_PROPERTIES
 class FontSize(float):
 	@classmethod
 	def default(cls) -> FontSize:
-		# TODO: investigate further about default font size
+		# ! TODO: investigate further about default font size
 		return cls(1.0)
 
 	@classmethod
@@ -200,7 +200,8 @@ class RunStyleProperties(ArbitraryBaseModel):
 			font_size=add.font_size if add.font_size is not None else agg.font_size,
 			font_color=add.font_color if add.font_color is not None else agg.font_color,
 			font_script=add.font_script if add.font_script is not None else agg.font_script,
-			# TODO: add table style possible toggle properties into the xor
+			# ! TODO: Add table style possible toggle properties into the xor gate
+			# bool(add.) is used because it could be None, which are interpreted as False
 			bold=default.bold or Bold(bool(add.bold) ^ agg.bold),
 			italic=default.italic or Italic(bool(add.italic) ^ agg.italic),
 			underline=default.underline or Underline(bool(add.underline) ^ agg.underline)
@@ -352,8 +353,7 @@ class StyleProperties(ArbitraryBaseModel):
 	 - script:
 	 - justification:
 	 - indentation:
-	TODO: Expand properties
-	!!!! TODO: Paragraph properties can also contain run properties, need to take this into account !!!!
+	! TODO: Paragraph properties can also contain run properties, need to take this into account
 	"""
 	run_style_properties: RunStyleProperties
 	paragraph_style_properties: ParagraphStyleProperties
