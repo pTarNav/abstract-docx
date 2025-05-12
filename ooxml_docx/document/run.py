@@ -137,7 +137,7 @@ class Run(OoxmlElement):
 		if run_style_search_result is not None:
 			return run_style_search_result
 
-		raise ValueError("")  # TODO
+		raise KeyError(f"Inexistent style referenced: {style_id=}.")
 	
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
