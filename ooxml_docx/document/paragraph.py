@@ -204,7 +204,7 @@ class Paragraph(OoxmlElement):
 						ooxml_hyperlink=ooxml_element, styles=styles, relationships=relationships
 					)
 				case _:
-					# ! TODO: remove continue
+					# ! TODO: Remove continue
 					continue
 					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
 			content.append(element)
@@ -233,8 +233,8 @@ class Paragraph(OoxmlElement):
 		if numbering_style_search_result is not None:
 			return numbering_style_search_result
 
-		# TODO: What happens if an external program adds a style reference that does not exist?
-		# TODO: Research by replicating this, if the word program accepts it as valid ooxml then so should I
+		# ! TODO: What happens if an external program adds a style reference that does not exist?
+		# ! TODO: Research by replicating this, if the word program accepts it as valid ooxml then so should I
 		raise ValueError(f"Undefined style reference for style id: {style_id}")
 	
 	@staticmethod
@@ -262,14 +262,14 @@ class Paragraph(OoxmlElement):
 			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 			if indentation_level is None:
 				# Defaults to the lowest one specified inside the numbering definition
-				indentation_level = 0  # TODO: check if this can be anything besides 0
+				indentation_level = 0  # ! TODO: Check if this can be anything besides 0
 				print(f"\033[33m[Warning] Lowest indentation level assumption for a paragraph.\033[0m")
 			indentation_level = int(indentation_level)
 
 			return numbering, indentation_level
 		
-		# TODO: Think about if this is necessary, or will it always be better to check numbering through style?
-		# TODO: if the latter is decided, need to check the processes that treat numbering afterwards (mainly abstract_docx normalization)
+		# ! TODO: Think about if this is necessary, or will it always be better to check numbering through style?
+		# ! TODO: If the latter is decided, need to check the processes that treat numbering afterwards (mainly abstract_docx normalization)
 		# Case: Numbering properties via numbering style or paragraph style
 		if style is not None and style.numbering is not None:
 			return style.numbering, style.indentation_level
