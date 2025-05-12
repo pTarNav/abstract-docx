@@ -194,21 +194,21 @@ class AbstractNumbering(OoxmlElement):
 		style_parent: Optional[NumberingStyle] = None
 		style_children: Optional[list[NumberingStyle]] = None
 
-		style_id: Optional[str] = ooxml_abstract_numbering.xpath_query(query="./w:numStyleLink/@w:val", singleton=True)
-		if style_id is not None:
-			style_parent = styles.find(id=str(style_id), type=OoxmlStyleTypes.NUMBERING)
+		style_parent_id: Optional[str] = ooxml_abstract_numbering.xpath_query(query="./w:numStyleLink/@w:val", singleton=True)
+		if style_parent_id is not None:
+			style_parent = styles.find(id=str(style_parent_id), type=OoxmlStyleTypes.NUMBERING)
 			if style_parent is None:
-				raise ValueError("was not able to find style from .find() when it should exist")  # TODO
+				raise KeyError(f"Inexistent parent style referenced: {style_parent_id=}.")
 
 		style_children_ids: Optional[list[str]] = ooxml_abstract_numbering.xpath_query(query="./w:styleLink/@w:val")
 		if style_children_ids is not None:
 			style_children: list[NumberingStyle] = []
-			for style_children_id in style_children_ids:
-				style_child: Optional[_NumberingStyle] = styles.find(id=str(style_children_id), type=OoxmlStyleTypes.NUMBERING)
+			for style_child_id in style_children_ids:
+				style_child: Optional[_NumberingStyle] = styles.find(id=str(style_child_id), type=OoxmlStyleTypes.NUMBERING)
 				if style_child is not None:
 					style_children.append(style_child)
 				else:
-					raise ValueError("was not able to find style from .find() when it should exist")  # TODO
+					raise KeyError(f"Inexistent child style referenced: {style_child_id=}.")
 		
 		return (
 			AbstractNumberingAssociatedStyles(style_parent=style_parent, style_children=style_children) 
