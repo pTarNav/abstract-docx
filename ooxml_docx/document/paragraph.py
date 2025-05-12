@@ -113,7 +113,7 @@ class Hyperlink(OoxmlElement):
 		if anchor_id is not None:
 			return OoxmlHyperlinkType.INTERNAL
 
-		raise ValueError("Undefined hyperlink type, cannot find target id reference")
+		raise ValueError("Undefined hyperlink type, cannot find target id reference.")
 
 	@staticmethod
 	def _parse_target(

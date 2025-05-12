@@ -294,7 +294,7 @@ class LevelOverride(OoxmlElement):
 		if level.id != id:
 			raise ValueError((
 				f"Level override id (<w:lvlOverride w:ilvl={id}>)"
-				f" and override level definition id (<w:lvl w:ilvl={level.id}>) do not match"
+				f" and override level definition id (<w:lvl w:ilvl={level.id}>) do not match."
 			))
 
 		return level
@@ -367,7 +367,7 @@ class Numbering(OoxmlElement):
 			None
 		)
 		if abstract_numbering is None:
-			raise ValueError(f"No abstract numbering definition <w:abstractNum> found for abstractNumId: {abstract_numbering}")
+			raise ValueError(f"No abstract numbering definition <w:abstractNum> found for abstractNumId: {abstract_numbering}.")
 
 		return abstract_numbering
 
@@ -415,7 +415,9 @@ class Numbering(OoxmlElement):
 		elif isinstance(style, NumberingStyle):
 			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 		else:
-			raise ValueError("") # TODO
+			raise TypeError(
+				f"Invalid style type (must be 'ParagraphStyle' or 'NumberingStyle'): {type(style)} (for {style.id=})."
+			)
 		
 		if indentation_level is not None:
 			return int(indentation_level)
