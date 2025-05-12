@@ -367,7 +367,9 @@ class Numbering(OoxmlElement):
 			None
 		)
 		if abstract_numbering is None:
-			raise ValueError(f"No abstract numbering definition <w:abstractNum> found for abstractNumId: {abstract_numbering}.")
+			raise ValueError(
+				f"No abstract numbering definition <w:abstractNum> found for abstractNumId: {abstract_numbering}."
+			)
 
 		return abstract_numbering
 
@@ -416,7 +418,7 @@ class Numbering(OoxmlElement):
 			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 		else:
 			raise TypeError(
-				f"Invalid style type (must be 'ParagraphStyle' or 'NumberingStyle'): {type(style)} (for {style.id=})."
+				f"Invalid OOXML style type (must be 'Paragraph' or 'Numbering'): {type(style)} (for {style.id=})."
 			)
 		
 		if indentation_level is not None:
@@ -453,6 +455,44 @@ class OoxmlNumberings(ArbitraryBaseModel):
 	abstract_numberings: list[AbstractNumbering] = []
 	numberings: list[Numbering] = []
 
+	def _associate_styles_and_numberings(
+			self, styles: list[ParagraphStyle | NumberingStyle], style_type: OoxmlStyleTypes
+		) -> None:
+		for style in styles:
+			if style.properties is not None:
+				match style_type:
+					case OoxmlStyleTypes.PARAGRAPH:
+						numbering_id: Optional[int] = style.properties.xpath_query(
+							query="./w:numPr/w:numId/@w:val", singleton=True
+						)
+					case OoxmlStyleTypes.NUMBERING:
+						numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
+					case _:
+						raise KeyError((
+							f"Invalid OOXML style type"
+							f" (must be 'OoxmlStyleTypes.PARAGRAPH' or 'OoxmlStyleTypes.Numbering'): {style_type}."
+						))
+				
+				if numbering_id is not None:
+					numbering_id = int(numbering_id)
+				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
+				
+				if numbering is not None:
+					style.numbering = numbering
+					style.indentation_level = numbering.find_style_level(style=style)
+
+				elif numbering_id is not None:
+					# In some cases (because of ooxml manipulation from external programs),
+					#  there is a numbering reference to an inexistent numbering instance.
+					# They are harmless and will be corrected in the abstract_docx normalization step.
+					# Raises a warning instead of an error and proceeds.
+					print(
+						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
+					)			
+
+			if style.children is not None:
+				self._associate_styles_and_numberings(styles=style.children, style_type=style_type)
+
 	@classmethod
 	def build(cls, ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlNumberings:
 		"""_summary_
@@ -474,8 +514,8 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		)
 
 		#
-		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.paragraph, style_type=OoxmlStyleTypes.PARAGRAPH)
-		ooxml_numberings.associate_styles_and_numberings(styles=styles.roots.numbering, style_type=OoxmlStyleTypes.NUMBERING)
+		ooxml_numberings._associate_styles_and_numberings(styles=styles.roots.paragraph, style_type=OoxmlStyleTypes.PARAGRAPH)
+		ooxml_numberings._associate_styles_and_numberings(styles=styles.roots.numbering, style_type=OoxmlStyleTypes.NUMBERING)
 
 		return ooxml_numberings
 	
@@ -515,41 +555,6 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			Numbering.parse(ooxml_numbering=ooxml_numbering, abstract_numberings=abstract_numberings, styles=styles)
 			for ooxml_numbering in ooxml_numberings
 		]
-	
-	def associate_styles_and_numberings(
-			self, styles: list[ParagraphStyle | NumberingStyle], style_type: OoxmlStyleTypes
-		) -> None:
-		for style in styles:
-			if style.properties is not None:
-				match style_type:
-					case OoxmlStyleTypes.PARAGRAPH:
-						numbering_id: Optional[int] = style.properties.xpath_query(
-							query="./w:numPr/w:numId/@w:val", singleton=True
-						)
-					case OoxmlStyleTypes.NUMBERING:
-						numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
-					case _:
-						raise ValueError("WTF are you doing")  # TODO
-				
-				if numbering_id is not None:
-					numbering_id = int(numbering_id)
-				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
-				
-				if numbering is not None:
-					style.numbering = numbering
-					style.indentation_level = numbering.find_style_level(style=style)
-
-				elif numbering_id is not None:
-					# In some cases (because of ooxml manipulation from external programs),
-					#  there is a numbering reference to an inexistent numbering instance.
-					# They are harmless and will be corrected in the abstract_docx normalization step.
-					# Raises a warning instead of an error and proceeds.
-					print(
-						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
-					)			
-
-			if style.children is not None:
-				self.associate_styles_and_numberings(styles=style.children, style_type=style_type)
 
 	
 	def find(self, id: int) -> Optional[Numbering]:
