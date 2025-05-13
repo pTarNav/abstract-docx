@@ -63,7 +63,7 @@ class FontScript(Enum):
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontScript]:
 		"""
-		Convert the OOXML attribute value to the corresponding Script enum.
+		Converts the OOXML attribute value to the corresponding Script enum.
 		"""
 		if not must_default and v is None:
 			return None

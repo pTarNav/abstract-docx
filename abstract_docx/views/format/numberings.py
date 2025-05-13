@@ -333,7 +333,7 @@ class Numbering(ArbitraryBaseModel):
 
 	def format(self, level_indexes: dict[int, int]) -> str:
 		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
-			raise KeyError("Unable to map") # TODO
+			raise KeyError("Level indexes could not be mapped to levels.")
 		
 		level_strings: dict[int, str] = {}
 		for k, v in level_indexes.items():

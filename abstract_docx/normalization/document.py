@@ -107,12 +107,13 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			if sum([len(v) for v in effective_numbering_matches.values()]) > 0:  # Not empty
 				matches[effective_numbering.id] = effective_numbering_matches
 		
-		# No matches detected
-		if sum([sum([len(v2) for v2 in v1.values()]) for v1 in matches.values()]) == 0:
-			return None
-		# One match detected
-		if sum([sum([len(v2) for v2 in v1.values()]) for v1 in matches.values()]) == 1:
-			return None # TODO return match
+		n_matches: int = sum([sum([len(v2) for v2 in v1.values()]) for v1 in matches.values()])
+		match n_matches:
+			case 0:
+				return None
+			case 1:
+				return None # TODO return match
+
 		return matches
 
 	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
@@ -251,8 +252,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
 					self._associate_effective_text_styles
 				case _:
+					# ! TODO: Remove continue
 					continue
-					raise ValueError("")  # TODO
+					raise ValueError(f"Unexpected ooxml block: {type(ooxml_block)}>")
 
 	def _associate_effective_block_styles(self) -> None:
 		"""_summary_
