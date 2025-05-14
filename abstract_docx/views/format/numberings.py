@@ -202,6 +202,15 @@ class Whitespace(Enum):
 			"tab": cls.TAB,
 		}.get(v, cls.default())
 	
+	def format(self) -> str:
+		match self:
+			case Whitespace.NONE:
+				return r""
+			case Whitespace.SPACE:
+				return r" "
+			case Whitespace.TAB:
+				return r"\t"
+
 	def detection_regex(self) -> str:
 		match self:
 			case Whitespace.NONE:
@@ -339,7 +348,10 @@ class Numbering(ArbitraryBaseModel):
 		for k, v in level_indexes.items():
 			level_strings[k] = self.levels[k].properties.marker_type.format(index=v)
 		
-		return self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+		marker_pattern: str = self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+		whitespace: str = self.levels[max(level_indexes.keys())].properties.whitespace.format()
+		return f"{marker_pattern}{whitespace}"
+			
 	
 	@cached_property
 	def detection_regexes(self) -> dict[int, Optional[re.Pattern]]:

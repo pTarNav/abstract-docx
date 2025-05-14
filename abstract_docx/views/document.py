@@ -39,6 +39,8 @@ class Block(ArbitraryBaseModel):
 	parent: Optional[Block] = None
 	children: Optional[list[Block]] = None
 
+	level_indexes: Optional[dict[int, int]] = None
+
 
 class Paragraph(Block):
 	content: list[Text]
