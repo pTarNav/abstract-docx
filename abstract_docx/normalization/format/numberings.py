@@ -26,13 +26,16 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	ooxml_numberings: OoxmlNumberings
 
 	effective_numberings: dict[int, Numbering]
-	effective_enumerations: dict[int, Enumeration]
+	effective_enumerations: dict[str, Enumeration]
 	effective_levels: dict[str, Level]
+
+	map_ooxml_to_effective_deduplicated_enumerations: dict[str, str] = {}
+	map_ooxml_to_effective_deduplicated_levels: dict[str, str] = {}
 
 	effective_styles_from_ooxml: EffectiveStylesFromOoxml
 
 	# Auxiliary data for intermediate steps
-	_discovered_effective_abstract_enumerations: dict[int, Enumeration] = {}
+	_discovered_effective_abstract_enumerations: dict[str, Enumeration] = {}
 	# It might be the case that the effective enumeration style has no actual level properties
 	_discovered_effective_enumeration_styles: dict[str, Optional[Enumeration]] = {}
 
@@ -59,17 +62,14 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			effective_styles_from_ooxml=effective_styles_from_ooxml
 		)
 		effective_numberings_from_ooxml.load()
-
+		effective_numberings_from_ooxml.deduplicate()
+		quit()
 		return effective_numberings_from_ooxml
 
-	@staticmethod
-	def _check_discovered(id: int | str, effective_discovered_enumerations: dict[int | str, Enumeration]) -> Optional[Enumeration]:
-		return effective_discovered_enumerations.get(id, None)
-		
 	def aggregate_effective_enumerations(self, agg_enumeration: Enumeration, add_enumeration: Enumeration) -> Enumeration:
 		effective_default_style: Style = self.effective_styles_from_ooxml.get_default()
 
-		levels: dict[int, Level] = {}
+		levels: dict[str, Level] = {}
 		for i in set(list(agg_enumeration.levels.keys()) + list(add_enumeration.levels.keys())):
 			agg_level: Optional[Level] = agg_enumeration.levels.get(i, None)
 			add_level: Optional[Level] = add_enumeration.levels.get(i, None)
@@ -120,7 +120,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 			# If ooxml abstract numbering has already been discovered, use already computed effective enumeration
 			effective_abstract_enumeration = self._discovered_effective_abstract_enumerations.get(
-				ooxml_style_parent.abstract_numbering_parent.id, None
+				str(ooxml_style_parent.abstract_numbering_parent.id), None
 			)
 
 			if effective_abstract_enumeration is None:
@@ -132,9 +132,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				)
 
 				effective_abstract_enumeration = self._discovered_effective_abstract_enumerations.get(
-					ooxml_style_parent.abstract_numbering_parent.id, None
+					str(ooxml_style_parent.abstract_numbering_parent.id), None
 				)
-				# The effective abstract numbering must have been discovered in the recursive step
+				# The effective abstract numbering must to have been discovered in the recursive step
 				if effective_abstract_enumeration is None:
 					raise ValueError("") # TODO
 
@@ -142,7 +142,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings.append(ooxml_style_parent.numbering.id)
 
 			# If ooxml numbering has already been discovered, use already computed effective enumeration
-			effective_enumeration = self.effective_enumerations.get(ooxml_style_parent.numbering.id, None)
+			effective_enumeration = self.effective_enumerations.get(str(ooxml_style_parent.numbering.id), None)
 			
 			if effective_enumeration is None:
 				self.compute_effective_enumeration(
@@ -152,9 +152,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_abstract_numberings=visited_ooxml_abstract_numberings
 				)
 
-				effective_enumeration = self.effective_enumerations.get(ooxml_style_parent.numbering.id, None)
-				# The effective abstract enumeration must have been discovered in the recursive step
-				if effective_abstract_enumeration is None:
+				effective_enumeration = self.effective_enumerations.get(str(ooxml_style_parent.numbering.id), None)
+				# The effective enumeration must have to been discovered in the recursive step
+				if effective_enumeration is None:
 					raise ValueError("") # TODO
 			
 		# Merge: (effective_abstract_enumerations) + (effective_enumerations) => merged_effective_enumeration_style
@@ -181,7 +181,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 		# If ooxml abstract numbering has already been discovered, use already computed effective enumeration
 		agg_effective_abstract_enumeration: Optional[Enumeration] = self._discovered_effective_abstract_enumerations.get(
-			ooxml_abstract_numbering.id, None
+			str(ooxml_abstract_numbering.id), None
 		)
 
 		if agg_effective_abstract_enumeration is None:
@@ -207,10 +207,10 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					)
 
 			effective_abstract_enumeration: Enumeration = Enumeration(
-				id=ooxml_abstract_numbering.id,
+				id=str(ooxml_abstract_numbering.id),
 				levels={
-					k: Level(
-						id=k,
+					str(k): Level(
+						id=str(k),
 						properties=LevelProperties.from_ooxml(level=v, must_default=must_default),
 						style=Style(
 							id=f"__@ABSTRACT_NUMBERING={ooxml_abstract_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
@@ -238,10 +238,10 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		
 		if ooxml_numbering is not None:
 			effective_enumeration: Enumeration = Enumeration(
-				id=ooxml_numbering.id,
+				id=str(ooxml_numbering.id),
 				levels={
-					k: Level(
-						id=k,
+					str(k): Level(
+						id=str(k),
 						properties=LevelProperties.from_ooxml(level=v.level, must_default=must_default),
 						style=Style(
 							id=f"__@NUMBERING={ooxml_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
@@ -262,12 +262,12 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				add_enumeration=effective_enumeration
 			)
 
-			self.effective_enumerations[agg_effective_enumeration.id] = agg_effective_enumeration
+			self.effective_enumerations[str(agg_effective_enumeration.id)] = agg_effective_enumeration
 
 	def _compute_effective_enumerations(self) -> None:
 		for ooxml_numbering in self.ooxml_numberings.numberings:
-			# If ooxml numbering has already been discovered, skip
-			effective_enumeration: Optional[Enumeration] = self.effective_enumerations.get(ooxml_numbering.id, None)
+			# If ooxml numbering has already been discovered, skip computation
+			effective_enumeration: Optional[Enumeration] = self.effective_enumerations.get(str(ooxml_numbering.id), None)
 			if effective_enumeration is None:
 				self.compute_effective_enumeration(
 					ooxml_numbering=ooxml_numbering,
@@ -275,26 +275,30 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_numberings=[ooxml_numbering.id],
 					visited_ooxml_abstract_numberings=[]
 				)
+				effective_enumeration = self.effective_enumerations.get(str(ooxml_numbering.id), None)
+				# The effective enumeration must have to been discovered
+				if effective_enumeration is None:
+					raise ValueError("") # TODO
 			
-			self.effective_numberings[ooxml_numbering.abstract_numbering.id].enumerations[ooxml_numbering.id] = (
-				effective_enumeration
-			)
-
+			# TODO: how to write this so the line is less than 128 chars long
+			self.effective_numberings[ooxml_numbering.abstract_numbering.id].enumerations[effective_enumeration.id] = effective_enumeration
+			for effective_level in effective_enumeration.levels.values():
+				self.effective_levels[f"__@ENUMERATION={effective_enumeration.id}@LEVEL={effective_level.id}__"] = effective_level
+					
 	def _associate_effective_level_styles(self) -> None:
 		"""_summary_
 		"""
 		# TODO: Optimize this loop so the inner effective styles loop is only done once
-		for effective_enumeration in self.effective_enumerations.values():
-			for effective_level in effective_enumeration.levels.values():
-				found_effective_style_match: bool = False
-				for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
-					if effective_level.style == effective_style:
-						effective_level.style = effective_style
-						found_effective_style_match = True
-						break
-				
-				if not found_effective_style_match:
-					self.effective_styles_from_ooxml.effective_styles[effective_level.style.id] = effective_level.style
+		for effective_level in self.effective_levels.values():
+			found_effective_style_match: bool = False
+			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
+				if effective_level.style == effective_style:
+					effective_level.style = effective_style
+					found_effective_style_match = True
+					break
+			
+			if not found_effective_style_match:
+				self.effective_styles_from_ooxml.effective_styles[effective_level.style.id] = effective_level.style
 
 	def load(self) -> None:
 		"""
@@ -302,8 +306,86 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		self._compute_effective_enumerations()
 		self._associate_effective_level_styles()
 
-		for effective_enumeration in self.effective_enumerations.values():
-			print(effective_enumeration)
-			print()
+		print(len(self.effective_enumerations))
+		print(len(self.effective_levels))
 
-		quit()
+	def _deduplicate_levels(self) -> None:
+		groups: dict[str, Level] = {}
+		_map_ooxml_to_effective_deduplicated_levels: dict[str, list[str]] = {}
+		for level in self.effective_levels.values():
+			duplicated_in_group: Optional[str] = None
+			for group_id, grouped_style in groups.items():
+				if level == grouped_style:	
+					duplicated_in_group = group_id
+			
+			if duplicated_in_group is not None:
+				new_group_id = f"{duplicated_in_group}&{level.id}" # TODO: what happens if for some reason there already exists a level with this id?
+				
+				groups[new_group_id] = groups.pop(duplicated_in_group)
+				groups[new_group_id].id = new_group_id
+
+				_map_ooxml_to_effective_deduplicated_levels[new_group_id] = (
+					_map_ooxml_to_effective_deduplicated_levels.pop(duplicated_in_group)
+				)
+				_map_ooxml_to_effective_deduplicated_levels[new_group_id].append(level.id)
+			else:
+				groups[level.id] = level
+				_map_ooxml_to_effective_deduplicated_levels[level.id] = [level.id]
+
+		self.effective_levels = groups
+		
+		for group_id, level_ids in _map_ooxml_to_effective_deduplicated_levels.items():
+			for level_id in level_ids:
+				self.map_ooxml_to_effective_deduplicated_levels[level_id] = group_id
+	
+	def _deduplicate_enumerations(self) -> None:
+		groups: dict[str, Enumeration] = {}
+		_map_ooxml_to_effective_deduplicated_enumerations: dict[str, list[str]] = {}
+		for enumeration in self.effective_enumerations.values():
+			duplicated_in_group: Optional[str] = None
+			for group_id, grouped_style in groups.items():
+				if enumeration == grouped_style:	# ! TODO: enumeration equal logic
+					duplicated_in_group = group_id
+			
+			if duplicated_in_group is not None:
+				new_group_id = f"{duplicated_in_group}&{enumeration.id}" # TODO: what happens if for some reason there already exists a enumeration with this id?
+				
+				groups[new_group_id] = groups.pop(duplicated_in_group)
+				groups[new_group_id].id = new_group_id
+
+				_map_ooxml_to_effective_deduplicated_enumerations[new_group_id] = (
+					_map_ooxml_to_effective_deduplicated_enumerations.pop(duplicated_in_group)
+				)
+				_map_ooxml_to_effective_deduplicated_enumerations[new_group_id].append(enumeration.id)
+			else:
+				groups[enumeration.id] = enumeration
+				_map_ooxml_to_effective_deduplicated_enumerations[enumeration.id] = [enumeration.id]
+
+		self.effective_enumerations = groups
+		
+		for group_id, enumeration_ids in _map_ooxml_to_effective_deduplicated_enumerations.items():
+			for enumeration_id in enumeration_ids:
+				self.map_ooxml_to_effective_deduplicated_enumerations[enumeration_id] = group_id
+
+	def deduplicate(self) -> None:
+		self._deduplicate_levels()
+		self._deduplicate_enumerations()
+
+		print(len(self.effective_enumerations))
+		print(len(self.effective_levels))
+	
+	def get_mapped_enumeration_id(self, ooxml_numbering_id: int) -> str:
+		return self.map_ooxml_to_effective_deduplicated_enumerations.get(str(ooxml_numbering_id))
+
+	def get_mapped_level_id(self, ooxml_numbering_id: int, ooxml_level_id: int) -> str:
+		return self.map_ooxml_to_effective_deduplicated_enumerations.get(
+			f"__@ENUMERATION={self.get_mapped_enumeration_id(ooxml_numbering_id=ooxml_numbering_id)}@LEVEL={ooxml_level_id}__"
+		)
+
+	def get_enumeration(self, ooxml_numbering_id: int) -> Optional[Enumeration]:
+		return self.effective_enumerations.get(self.get_mapped_enumeration_id(ooxml_numbering_id=ooxml_numbering_id))
+	
+	def get_level(self, ooxml_numbering_id: int, ooxml_level_id: int) -> Optional[Level]:
+		return self.effective_levels.get(
+			self.get_mapped_level_id(ooxml_numbering_id=ooxml_numbering_id, ooxml_level_id=ooxml_level_id)
+		)

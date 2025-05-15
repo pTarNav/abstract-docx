@@ -297,11 +297,9 @@ class LevelProperties(ArbitraryBaseModel):
 				)
 			)
 
-		if must_default:
-			print(None, "defaulted")
+		if must_default:	
 			return cls.default()
 		
-		print(None, None)
 		return cls()
 
 	@classmethod
@@ -328,15 +326,15 @@ class LevelProperties(ArbitraryBaseModel):
 # TODO change ids to str
 
 class Level(ArbitraryBaseModel):
-	id: int
+	id: str
 
 	properties: LevelProperties
 	style: Style
 
 class Enumeration(ArbitraryBaseModel):
-	id: int
+	id: str
 
-	levels: dict[int, Level]
+	levels: dict[str, Level]
 
 	def format(self, level_indexes: dict[int, int]) -> str:
 		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
@@ -410,9 +408,9 @@ class Enumeration(ArbitraryBaseModel):
 class Numbering(ArbitraryBaseModel):
 	id: int
 
-	enumerations: dict[int, Enumeration]
+	enumerations: dict[str, Enumeration]
 	
-	counter: Optional[dict[int, int]] = None
+	counter: Optional[dict[str, int]] = None
 
 
 class Index(ArbitraryBaseModel):
