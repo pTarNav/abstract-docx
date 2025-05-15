@@ -13,6 +13,7 @@ class Format(ArbitraryBaseModel):
 	level: Optional[Level] = None
 
 
+# TODO: move to styles.py
 class StylesView(ArbitraryBaseModel):
 	styles: dict[str, Style]
 	priority_keys: dict[int, list[str]]
@@ -30,6 +31,9 @@ class StylesView(ArbitraryBaseModel):
 	@property
 	def priorities(self) -> dict[int, list[Style]]:
 		return {level: [self.styles[name] for name in styles_keys] for level, styles_keys in self.priority_keys.items()}
+	
+class NumberingsView(ArbitraryBaseModel):
+	numberings: dict[int, Numbering]
 	
 
 class FormatsView(ArbitraryBaseModel):

@@ -325,20 +325,18 @@ class LevelProperties(ArbitraryBaseModel):
 				# If this happens something has terribly gone wrong.
 				raise ValueError("")
 
+# TODO change ids to str
+
 class Level(ArbitraryBaseModel):
 	id: int
 
 	properties: LevelProperties
 	style: Style
 
-
-class Numbering(ArbitraryBaseModel):
+class Enumeration(ArbitraryBaseModel):
 	id: int
 
 	levels: dict[int, Level]
-
-	parent: Optional[Numbering] = None
-	children: Optional[list[Numbering]] = None
 
 	def format(self, level_indexes: dict[int, int]) -> str:
 		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
@@ -408,4 +406,16 @@ class Numbering(ArbitraryBaseModel):
 		
 		return matches
 		
-		
+
+class Numbering(ArbitraryBaseModel):
+	id: int
+
+	enumerations: dict[int, Enumeration]
+	
+	counter: Optional[dict[int, int]] = None
+
+
+class Index(ArbitraryBaseModel):
+	numbering: Numbering
+	enumeration: Enumeration
+	level: Level

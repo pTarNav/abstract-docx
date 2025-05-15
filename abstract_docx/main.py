@@ -64,9 +64,9 @@ class AbstractDocx(ArbitraryBaseModel):
 		self.normalization()
 		document_root: Block = self.hierarchization()
 		
-		self.print(document_root=document_root)
+		#self.print(document_root=document_root, include_metadata=True)
 
-	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, metadata: bool = False) -> None:
+	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		
 		def node_style(d: int) -> str:
 			# evenly space hues around the color wheel
@@ -87,6 +87,12 @@ class AbstractDocx(ArbitraryBaseModel):
 				+ RichText(str(curr_block), style="white")
 			)
 			curr_tree_node = prev_tree_node.add(rich_text)
+
+			if include_metadata:
+				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
+				# curr_tree_node.add(f"Numbering ID: {curr_block.format.numbering.id if curr_block.format is not None and curr_block.format.numbering is not None else '-'}")
+				# curr_tree_node.add(f"Level ID: {curr_block.format.level.id if curr_block.format is not None and curr_block.format.level is not None else '-'}")
+				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
 		else:
 			rich_text: RichText = (
 				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
@@ -96,12 +102,12 @@ class AbstractDocx(ArbitraryBaseModel):
 		
 		if curr_block.children is not None:
 			for child in curr_block.children:
-				self._print_document(curr_block=child, prev_tree_node=curr_tree_node, depth=depth+1)
+				self._print_document(curr_block=child, prev_tree_node=curr_tree_node, depth=depth+1, include_metadata=include_metadata)
 
 	def print(self, document_root: Block, include_metadata: bool = False) -> None:
 		tree_root: Tree = Tree("Document")
 
-		self._print_document(curr_block=document_root, prev_tree_node=tree_root)
+		self._print_document(curr_block=document_root, prev_tree_node=tree_root, include_metadata=include_metadata)
 		print(rich_tree_to_str(tree_root))
 	
 	
