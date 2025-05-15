@@ -27,7 +27,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 
 	effective_numberings: dict[int, Numbering]
 	effective_enumerations: dict[int, Enumeration]
-	effective_levels: dict[int, dict[int, Level]]
+	effective_levels: dict[str, Level]
 
 	effective_styles_from_ooxml: EffectiveStylesFromOoxml
 
@@ -275,6 +275,10 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_numberings=[ooxml_numbering.id],
 					visited_ooxml_abstract_numberings=[]
 				)
+			
+			self.effective_numberings[ooxml_numbering.abstract_numbering.id].enumerations[ooxml_numbering.id] = (
+				effective_enumeration
+			)
 
 	def _associate_effective_level_styles(self) -> None:
 		"""_summary_
