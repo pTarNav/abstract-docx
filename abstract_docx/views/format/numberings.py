@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum
 
 import re
@@ -331,10 +331,22 @@ class Level(ArbitraryBaseModel):
 	properties: LevelProperties
 	style: Style
 
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Level):
+			return self.properties == v.properties and self.style == v.style
+		
+		raise ValueError("") # TODO
+
 class Enumeration(ArbitraryBaseModel):
 	id: str
 
 	levels: dict[str, Level]
+
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Enumeration):
+			return self.levels == v.levels
+		
+		raise ValueError("") # TODO
 
 	def format(self, level_indexes: dict[int, int]) -> str:
 		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
@@ -403,7 +415,7 @@ class Enumeration(ArbitraryBaseModel):
 							matches["regex_only"].append(level)
 		
 		return matches
-		
+	
 
 class Numbering(ArbitraryBaseModel):
 	id: int

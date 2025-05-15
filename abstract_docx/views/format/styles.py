@@ -404,4 +404,5 @@ class Style(ArbitraryBaseModel):
 	def __eq__(self, v: Any) -> bool:
 		if isinstance(v, Style):
 			return self.properties == v.properties
-		return None
+		
+		raise ValueError("") # TODO

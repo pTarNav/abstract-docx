@@ -280,10 +280,22 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				if effective_enumeration is None:
 					raise ValueError("") # TODO
 			
-			# TODO: how to write this so the line is less than 128 chars long
-			self.effective_numberings[ooxml_numbering.abstract_numbering.id].enumerations[effective_enumeration.id] = effective_enumeration
+			# TODO: how to write this so the line is less than 128 chars long	
+			# 		
+			_levels: dict[str, Level] = {}
 			for effective_level in effective_enumeration.levels.values():
-				self.effective_levels[f"__@ENUMERATION={effective_enumeration.id}@LEVEL={effective_level.id}__"] = effective_level
+				if not effective_level.id in self.effective_levels.keys():
+					new_effective_level_id: str = f"__@ENUMERATION={effective_enumeration.id}@LEVEL={effective_level.id}__"
+					effective_level.id = new_effective_level_id
+					_levels[new_effective_level_id] = effective_level
+				else:
+					_levels[effective_level.id] = effective_level
+
+			# Reconstruct levels inside the effective enumeration with the new id
+			effective_enumeration.levels = _levels
+			self.effective_levels.update(_levels)
+
+			self.effective_numberings[ooxml_numbering.abstract_numbering.id].enumerations[effective_enumeration.id] = effective_enumeration
 					
 	def _associate_effective_level_styles(self) -> None:
 		"""_summary_
@@ -306,6 +318,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		self._compute_effective_enumerations()
 		self._associate_effective_level_styles()
 
+		print(len(self.effective_numberings))
 		print(len(self.effective_enumerations))
 		print(len(self.effective_levels))
 
@@ -314,8 +327,8 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		_map_ooxml_to_effective_deduplicated_levels: dict[str, list[str]] = {}
 		for level in self.effective_levels.values():
 			duplicated_in_group: Optional[str] = None
-			for group_id, grouped_style in groups.items():
-				if level == grouped_style:	
+			for group_id, grouped_level in groups.items():
+				if level == grouped_level:	
 					duplicated_in_group = group_id
 			
 			if duplicated_in_group is not None:
@@ -329,22 +342,30 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				)
 				_map_ooxml_to_effective_deduplicated_levels[new_group_id].append(level.id)
 			else:
-				groups[level.id] = level
+				groups[level.id] = level.model_copy()  # It should be treated as another instance of the level in memory
 				_map_ooxml_to_effective_deduplicated_levels[level.id] = [level.id]
-
+		
 		self.effective_levels = groups
 		
 		for group_id, level_ids in _map_ooxml_to_effective_deduplicated_levels.items():
 			for level_id in level_ids:
 				self.map_ooxml_to_effective_deduplicated_levels[level_id] = group_id
 	
+	def _associate_deduplicated_levels(self) -> None:
+		for enumeration in self.effective_enumerations.values():
+			_levels: dict[str, Level] = {}
+			for level in enumeration.levels.values():
+				_levels[level.id] = self.effective_levels[self.map_ooxml_to_effective_deduplicated_levels.get(level.id)]
+				
+			enumeration.levels = _levels
+
 	def _deduplicate_enumerations(self) -> None:
 		groups: dict[str, Enumeration] = {}
 		_map_ooxml_to_effective_deduplicated_enumerations: dict[str, list[str]] = {}
 		for enumeration in self.effective_enumerations.values():
 			duplicated_in_group: Optional[str] = None
-			for group_id, grouped_style in groups.items():
-				if enumeration == grouped_style:	# ! TODO: enumeration equal logic
+			for group_id, grouped_enumeration in groups.items():
+				if enumeration == grouped_enumeration:	# ! TODO: enumeration equal logic
 					duplicated_in_group = group_id
 			
 			if duplicated_in_group is not None:
@@ -358,7 +379,8 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				)
 				_map_ooxml_to_effective_deduplicated_enumerations[new_group_id].append(enumeration.id)
 			else:
-				groups[enumeration.id] = enumeration
+				# It should be treated as another instance of the enumeration in memory
+				groups[enumeration.id] = enumeration.model_copy()
 				_map_ooxml_to_effective_deduplicated_enumerations[enumeration.id] = [enumeration.id]
 
 		self.effective_enumerations = groups
@@ -367,10 +389,23 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			for enumeration_id in enumeration_ids:
 				self.map_ooxml_to_effective_deduplicated_enumerations[enumeration_id] = group_id
 
+	def _associate_deduplicated_enumerations(self) -> None:
+		for numbering in self.effective_numberings.values():
+			_enumerations: dict[str, Enumeration] = {}
+			for enumeration in numbering.enumerations.values():
+				# At this stage the old enumeration ids still corresponds to its ooxml id
+				_enumerations[enumeration.id] = self.get_enumeration(ooxml_numbering_id=int(enumeration.id))
+			
+			numbering.enumerations = _enumerations
+
 	def deduplicate(self) -> None:
 		self._deduplicate_levels()
+		self._associate_deduplicated_levels()
 		self._deduplicate_enumerations()
+		self._associate_deduplicated_enumerations()
 
+		print()
+		print(len(self.effective_numberings))
 		print(len(self.effective_enumerations))
 		print(len(self.effective_levels))
 	
@@ -378,7 +413,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		return self.map_ooxml_to_effective_deduplicated_enumerations.get(str(ooxml_numbering_id))
 
 	def get_mapped_level_id(self, ooxml_numbering_id: int, ooxml_level_id: int) -> str:
-		return self.map_ooxml_to_effective_deduplicated_enumerations.get(
+		return self.map_ooxml_to_effective_deduplicated_levels.get(
 			f"__@ENUMERATION={self.get_mapped_enumeration_id(ooxml_numbering_id=ooxml_numbering_id)}@LEVEL={ooxml_level_id}__"
 		)
 

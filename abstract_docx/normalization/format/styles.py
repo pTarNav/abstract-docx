@@ -173,7 +173,7 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 				)
 				_map_effective_to_effective_deduplicated_styles[new_group_id].append(style.id)
 			else:
-				groups[style.id] = style
+				groups[style.id] = style.model_copy()  # It should be treated as another instance of the style in memory
 				_map_effective_to_effective_deduplicated_styles[style.id] = [style.id]
 
 		self.effective_styles = groups
