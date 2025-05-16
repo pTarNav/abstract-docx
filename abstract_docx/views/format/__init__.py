@@ -4,14 +4,11 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.views.format.styles import Style
-from abstract_docx.views.format.numberings import Numbering, Level
-
+from abstract_docx.views.format.numberings import Index, Numbering, Enumeration, Level
 
 class Format(ArbitraryBaseModel):
 	style: Style
-	numbering: Optional[Numbering] = None
-	level: Optional[Level] = None
-
+	index: Optional[Index] = None
 
 # TODO: move to styles.py
 class StylesView(ArbitraryBaseModel):
@@ -31,11 +28,36 @@ class StylesView(ArbitraryBaseModel):
 	@property
 	def priorities(self) -> dict[int, list[Style]]:
 		return {level: [self.styles[name] for name in styles_keys] for level, styles_keys in self.priority_keys.items()}
-	
+
+
 class NumberingsView(ArbitraryBaseModel):
 	numberings: dict[int, Numbering]
-	
+	enumerations: dict[str, Enumeration]
+	levels: dict[str, Level]
+
+	priority_keys: dict[int, list[str]]
+
+	@classmethod
+	def load(
+		cls, numberings: dict[int, Numbering],
+		enumerations: dict[str, Enumeration],
+		levels: dict[str, Level],
+		ordered_levels: list[list[Level]]
+	) -> NumberingsView:
+		return cls(
+			numberings=numberings,
+			enumerations=enumerations,
+			levels=levels,
+			priority_keys={
+				priority_level: [style.id for style in levels_in_priority_level]
+				for priority_level, levels_in_priority_level in enumerate(ordered_levels)
+			}
+		)
+
+	@property
+	def priorities(self) -> dict[int, list[Level]]:
+		return {level: [self.levels[name] for name in levels_keys] for level, levels_keys in self.priority_keys.items()}
 
 class FormatsView(ArbitraryBaseModel):
 	styles: StylesView
-	numberings: dict[int, Numbering]
+	numberings: NumberingsView

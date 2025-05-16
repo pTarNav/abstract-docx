@@ -340,7 +340,7 @@ class Level(ArbitraryBaseModel):
 class Enumeration(ArbitraryBaseModel):
 	id: str
 
-	levels: dict[str, Level]
+	levels: dict[int, Level]
 
 	def __eq__(self, v: Any) -> bool:
 		if isinstance(v, Enumeration):
@@ -367,7 +367,6 @@ class Enumeration(ArbitraryBaseModel):
 		level_regexes: dict[int, Optional[re.Pattern]] = {}
 		for k, v in self.levels.items():
 			level_indexes_regexes[k] = v.properties.marker_type.detection_regex()
-
 			if (
 				v.properties.marker_pattern is not None
 				 and v.properties.marker_type is not None

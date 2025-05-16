@@ -77,7 +77,7 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml) -> Styles
 
 	ordered_styles: list[list[Style]] = []
 
-	for effective_style in effective_styles.values():
+	for effective_style in effective_styles.effective_styles.values():
 		if len(ordered_styles) == 0:
 			ordered_styles.append([effective_style])
 		else:
@@ -101,6 +101,6 @@ def styles_hierarchization(effective_styles: EffectiveStylesFromOoxml) -> Styles
 						ordered_styles.insert(i, [effective_style])
 						break
 	
-	return StylesView.load(styles=effective_styles, ordered_styles=ordered_styles)
+	return StylesView.load(styles=effective_styles.effective_styles, ordered_styles=ordered_styles)
 
 	

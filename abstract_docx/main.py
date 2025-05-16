@@ -8,9 +8,10 @@ from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.views import AbstractDocxViews
 from abstract_docx.views.document import Block, Paragraph
-from abstract_docx.views.format import StylesView, FormatsView
+from abstract_docx.views.format import StylesView, FormatsView, NumberingsView
 
 from abstract_docx.hierarchization.format.styles import styles_hierarchization
+from abstract_docx.hierarchization.format.numberings import numberings_hierarchization
 from abstract_docx.hierarchization.document import document_hierarchization
 
 
@@ -53,8 +54,14 @@ class AbstractDocx(ArbitraryBaseModel):
 		raise ValueError("Please call")
 
 	def hierarchization(self) -> Block:
-		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles.effective_styles)
-		return document_hierarchization(effective_document=self._effective_structure.document.effective_document, formats_view=FormatsView(styles=styles_view, numberings=self._effective_structure.numberings.effective_numberings))
+		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles)
+		numberings_view: NumberingsView = numberings_hierarchization(
+			effective_numberings=self._effective_structure.numberings, styles_view=styles_view
+		)
+		return document_hierarchization(
+			effective_document=self._effective_structure.document, 
+			formats_view=FormatsView(styles=styles_view, numberings=numberings_view)
+		)
 
 	def __call__(self, *args, **kwds) -> None:
 		"""
@@ -64,7 +71,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		self.normalization()
 		document_root: Block = self.hierarchization()
 		
-		#self.print(document_root=document_root, include_metadata=True)
+		self.print(document_root=document_root, include_metadata=False)
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		
@@ -76,7 +83,7 @@ class AbstractDocx(ArbitraryBaseModel):
 			return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 		
 		if curr_block.level_indexes is not None:
-			curr_block_numbering_str: str = curr_block.format.numbering.format(level_indexes=curr_block.level_indexes)
+			curr_block_numbering_str: str = curr_block.format.index.enumeration.format(level_indexes=curr_block.level_indexes)
 		else:
 			curr_block_numbering_str: str = ""
 
