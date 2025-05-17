@@ -121,8 +121,8 @@ class AbstractNumberingAssociatedStyles(ArbitraryBaseModel):
 	def _tree_str_(self) -> Tree:
 		tree = Tree("[bold cyan]Associated styles[/bold cyan]")
 
-		if self.style is not None:
-			tree.add(f"[bold]Parent[/bold]: '{self.style.id}'")
+		if self.style_parent is not None:
+			tree.add(f"[bold]Parent[/bold]: '{self.style_parent.id}'")
 		
 		if self.style_children is not None:
 			s = ", ".join([f"'{style.id}'" for style in self.style_children])
@@ -399,7 +399,7 @@ class Numbering(OoxmlElement):
 
 		return level_overrides
 	
-	def find_style_level(self, style: ParagraphStyle | NumberingStyle) -> int:
+	def find_style_level(self, style: ParagraphStyle | NumberingStyle, visited_abstract_numberings: Optional[list[int]] = None) -> int:
 		"""_summary_
 		There are 3 cases when parsing the indentation level (ordered by priority):
 		 - The indentation level is explicit, by stating the indentation level in the numbering properties.
@@ -411,6 +411,12 @@ class Numbering(OoxmlElement):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
+		# Ensure that same abstract numbering is not visited twice to avoid infinite recursive loops in the search
+		if visited_abstract_numberings is None:
+			visited_abstract_numberings = []
+		if self.abstract_numbering.id in visited_abstract_numberings:
+			raise RecursionError("")  # TODO
+
 		# Case: Style contains an indentation level marker.
 		if isinstance(style, ParagraphStyle):
 			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:ilvl/@w:val", singleton=True)
@@ -425,12 +431,21 @@ class Numbering(OoxmlElement):
 			return int(indentation_level)
 
 		# Case: Indentation level is marked by the style inside the level object.
-		# Assumption: Only consider the direct abstract numbering,
-		#  do not go down the chain of style and abstract numbering hierarchy.
-		# ! Might be needed to change in the future if the assumption is not correct...
 		for i, level in self.abstract_numbering.levels.items():
 			if level.style is not None and level.style.id == style.id:
 				return i
+		if self.abstract_numbering.associated_styles is not None and self.abstract_numbering.associated_styles.style_parent is not None:
+			print(self.abstract_numbering.id)
+			print(self.abstract_numbering.associated_styles.style_parent)
+		if (
+			self.abstract_numbering.associated_styles is not None 
+			and self.abstract_numbering.associated_styles.style_parent is not None
+			and self.abstract_numbering.associated_styles.style_parent.numbering is not None
+		):
+			visited_abstract_numberings.append(self.abstract_numbering.id)
+			return self.abstract_numbering.associated_styles.style_parent.numbering.find_style_level(
+				style=style, visited_abstract_numberings=visited_abstract_numberings
+			)
 		
 		# In some cases (because of ooxml manipulation from external programs),	
 		#  it might be assumed that the level to be used is the lowest one available.
@@ -479,7 +494,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 				
 				if numbering is not None:
 					style.numbering = numbering
-					style.indentation_level = numbering.find_style_level(style=style)
+					# Indentation level is found after all the styles have been assigned their respective numbering
 
 				elif numbering_id is not None:
 					# In some cases (because of ooxml manipulation from external programs),
@@ -492,6 +507,18 @@ class OoxmlNumberings(ArbitraryBaseModel):
 
 			if style.children is not None:
 				self._associate_styles_and_numberings(styles=style.children, style_type=style_type)
+	
+	def _find_styles_indentation_levels(self, styles: list[ParagraphStyle | NumberingStyle]) -> None:
+		"""
+		Indentation levels need to be found after the numberings have been assigned due to their recursive nature
+		"""
+		for style in styles:
+			if style.numbering is not None:
+				style.indentation_level = style.numbering.find_style_level(style=style)
+			
+			if style.children is not None:
+				self._find_styles_indentation_levels(styles=style.children)
+
 
 	@classmethod
 	def build(cls, ooxml_numbering_part: OoxmlPart, styles: OoxmlStyles) -> OoxmlNumberings:
@@ -516,6 +543,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		#
 		ooxml_numberings._associate_styles_and_numberings(styles=styles.roots.paragraph, style_type=OoxmlStyleTypes.PARAGRAPH)
 		ooxml_numberings._associate_styles_and_numberings(styles=styles.roots.numbering, style_type=OoxmlStyleTypes.NUMBERING)
+		ooxml_numberings._find_styles_indentation_levels(styles=styles.roots.paragraph+styles.roots.numbering)
 
 		return ooxml_numberings
 	

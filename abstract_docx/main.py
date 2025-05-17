@@ -97,9 +97,9 @@ class AbstractDocx(ArbitraryBaseModel):
 			curr_tree_node = prev_tree_node.add(rich_text)
 
 			if include_metadata:
-				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
-				# curr_tree_node.add(f"Numbering ID: {curr_block.format.numbering.id if curr_block.format is not None and curr_block.format.numbering is not None else '-'}")
-				# curr_tree_node.add(f"Level ID: {curr_block.format.level.id if curr_block.format is not None and curr_block.format.level is not None else '-'}")
+				# curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
+				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				# curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
 		else:
 			rich_text: RichText = (
