@@ -150,48 +150,43 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_paragraph.style.id)
 			else:
 				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get_default()
-		
+
 		effective_paragraph_content: list[Text] = self._compute_effective_texts(
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
 
 		# TODO: put this logic inside the style properties interface
-		# Check if there are run style properties shared amongst (all or in the majority) the paragraph contents.
+		# TODO: this should include the majority not all !!!!
+		# Check if there are run style properties shared amongst all the paragraph contents.
 		# If so pull them into the paragraph style.
 		if len(effective_paragraph_content) > 0:
 			shared_text_run_style_properties: RunStyleProperties = effective_paragraph_content[0].style.properties.run_style_properties
 			for i, effective_text in enumerate(effective_paragraph_content[1:]):
-				shared_text_run_style_properties = RunStyleProperties(
-					font_size=shared_text_run_style_properties.font_size
-					if shared_text_run_style_properties.font_size == effective_text.style.properties.run_style_properties.font_size
-					else None,
-					font_color=shared_text_run_style_properties.font_color
-					if shared_text_run_style_properties.font_color == effective_text.style.properties.run_style_properties.font_color
-					else None,
-					font_script=shared_text_run_style_properties.font_script
-					if shared_text_run_style_properties.font_script == effective_text.style.properties.run_style_properties.font_script
-					else None,
-					bold=shared_text_run_style_properties.bold
-					if shared_text_run_style_properties.bold == effective_text.style.properties.run_style_properties.bold
-					else None,
-					italic=shared_text_run_style_properties.italic
-					if shared_text_run_style_properties.italic == effective_text.style.properties.run_style_properties.italic
-					else None,
-					underline=shared_text_run_style_properties.underline
-					if shared_text_run_style_properties.underline == effective_text.style.properties.run_style_properties.underline
-					else None
-				)
-			
+				if len(effective_text.text.strip()) > 0:
+					shared_text_run_style_properties = RunStyleProperties(
+						font_size=shared_text_run_style_properties.font_size
+						if shared_text_run_style_properties.font_size == effective_text.style.properties.run_style_properties.font_size
+						else None,
+						font_color=shared_text_run_style_properties.font_color
+						if shared_text_run_style_properties.font_color == effective_text.style.properties.run_style_properties.font_color
+						else None,
+						font_script=shared_text_run_style_properties.font_script
+						if shared_text_run_style_properties.font_script == effective_text.style.properties.run_style_properties.font_script
+						else None,
+						bold=shared_text_run_style_properties.bold
+						if shared_text_run_style_properties.bold == effective_text.style.properties.run_style_properties.bold
+						else None,
+						italic=shared_text_run_style_properties.italic
+						if shared_text_run_style_properties.italic == effective_text.style.properties.run_style_properties.italic
+						else None,
+						underline=shared_text_run_style_properties.underline
+						if shared_text_run_style_properties.underline == effective_text.style.properties.run_style_properties.underline
+						else None
+					)
+
 			if shared_text_run_style_properties != effective_paragraph_style.properties.run_style_properties:
-				effective_paragraph_style.properties = StyleProperties.aggregate_ooxml(
-					agg=effective_paragraph_style.properties,
-					add=StyleProperties(
-						run_style_properties=shared_text_run_style_properties,
-						paragraph_style_properties=effective_paragraph_style.properties.paragraph_style_properties
-					), 
-					default=self.effective_styles_from_ooxml.get_default().properties
-				)
-		
+				effective_paragraph_style.properties.run_style_properties.patch(other=shared_text_run_style_properties)
+
 		# TODO: Check if there is whitespace in front of the paragraph contents
 		# Cases:
 		#  - Paragraph occupies just 1 line: The whitespace is pulled into the start indentation.
@@ -299,5 +294,4 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		self._associate_effective_block_styles()
-		
 	

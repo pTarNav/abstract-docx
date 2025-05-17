@@ -58,6 +58,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		numberings_view: NumberingsView = numberings_hierarchization(
 			effective_numberings=self._effective_structure.numberings, styles_view=styles_view
 		)
+
 		return document_hierarchization(
 			effective_document=self._effective_structure.document, 
 			formats_view=FormatsView(styles=styles_view, numberings=numberings_view)
@@ -99,7 +100,7 @@ class AbstractDocx(ArbitraryBaseModel):
 				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
 				# curr_tree_node.add(f"Numbering ID: {curr_block.format.numbering.id if curr_block.format is not None and curr_block.format.numbering is not None else '-'}")
 				# curr_tree_node.add(f"Level ID: {curr_block.format.level.id if curr_block.format is not None and curr_block.format.level is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
+				# curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
 		else:
 			rich_text: RichText = (
 				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
