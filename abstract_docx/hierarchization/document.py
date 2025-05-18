@@ -1,3 +1,4 @@
+from enum import Enum
 from abstract_docx.normalization.document import EffectiveDocumentFromOoxml
 from abstract_docx.views.format import FormatsView
 from abstract_docx.views.document import Paragraph, Block
@@ -5,6 +6,11 @@ from abstract_docx.views.format.styles import Style
 
 from typing import Optional
 
+class HierarchizationConflictResolutionParameter(Enum):
+	BOUNDED = "bounded"
+	UNBOUNDED = "unbounded"
+
+hierarchization_conflict_resolution = HierarchizationConflictResolutionParameter.UNBOUNDED
 
 def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_levels: dict[int, int], _computed_numbering_level_indexes: dict[int, dict[int, int]], formats_view: FormatsView):
 	end_of_recursion: bool = True
@@ -19,13 +25,6 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 		and prev_block.format.index is not None 
 		and curr_block.format.index.numbering == prev_block.format.index.numbering
 	)
-
-	if curr_block.id == 55:
-		print("prev", prev_block.id, prev_style_priority_level)
-		print("curr", curr_block.id, curr_style_priority_level)
-		print("share numbering", shared_numbering)
-		print(prev_block.format.style)
-		print(curr_block.format.style)
 	
 	# (I know this could be optimized into an if tree with only 3 outcomes, but this is more readable... :D)
 	if shared_numbering:
@@ -56,26 +55,27 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 					prev_block.children.append(curr_block)
 				curr_block.parent = prev_block
 			else:
-				raise ValueError("") # TODO
-				# TODO: just raise the error
-				if prev_style_priority_level == curr_style_priority_level:
-					# shared parent
-					prev_block.parent.children.append(curr_block)
-					curr_block.parent = prev_block.parent
-				else:
-					if prev_style_priority_level > curr_style_priority_level:
-						# traverse
-						traverse(curr_block=curr_block, prev_block=prev_block.parent, _computed_style_priority_levels=_computed_style_priority_levels, _computed_numbering_level_indexes=_computed_numbering_level_indexes, formats_view=formats_view)
-						end_of_recursion = False
-					elif prev_style_priority_level < curr_style_priority_level:
-						# child
-						if prev_block.children is None:
-							prev_block.children = [curr_block]
-						else:
-							prev_block.children.append(curr_block)
-						curr_block.parent = prev_block
-				
-				# TODO: ---
+				match hierarchization_conflict_resolution:
+					case HierarchizationConflictResolutionParameter.BOUNDED:
+						raise ValueError("") # TODO
+					case HierarchizationConflictResolutionParameter.UNBOUNDED:
+						if (
+							prev_numbering_priority_level < curr_numbering_priority_level
+							and prev_style_priority_level > curr_style_priority_level
+						):
+							# child
+							if prev_block.children is None:
+								prev_block.children = [curr_block]
+							else:
+								prev_block.children.append(curr_block)
+							curr_block.parent = prev_block
+						elif (
+							prev_numbering_priority_level < curr_numbering_priority_level
+							and prev_style_priority_level > curr_style_priority_level	
+						):
+							# traverse
+							traverse(curr_block=curr_block, prev_block=prev_block.parent, _computed_style_priority_levels=_computed_style_priority_levels, _computed_numbering_level_indexes=_computed_numbering_level_indexes, formats_view=formats_view)
+							end_of_recursion = False
 	else:
 		if prev_style_priority_level == curr_style_priority_level:
 			# shared parent
