@@ -97,10 +97,11 @@ class AbstractDocx(ArbitraryBaseModel):
 			curr_tree_node = prev_tree_node.add(rich_text)
 
 			if include_metadata:
-				# curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
+				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
 				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				# curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
+				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
 		else:
 			rich_text: RichText = (
 				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
@@ -121,5 +122,5 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
+	x = AbstractDocx.read(file_path=f"test/{test_files[3]}.docx")
 	x()	

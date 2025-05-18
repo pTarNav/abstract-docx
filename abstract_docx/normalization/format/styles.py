@@ -187,7 +187,8 @@ class EffectiveStylesFromOoxml(ArbitraryBaseModel):
 		return self.map_effective_to_effective_deduplicated_styles.get(effective_merged_style_id, effective_merged_style_id)
 
 	def get(self, ooxml_style_id: str) -> Optional[Style]:
-		return self.effective_styles.get(self.get_mapped_id(ooxml_style_id=ooxml_style_id))
+		r: Optional[Style] = self.effective_styles.get(self.get_mapped_id(ooxml_style_id=ooxml_style_id))
+		return r.model_copy(deep=True) if r is not None else None
 
 	def get_default(self) -> Style:
 		return self.get(ooxml_style_id="__DocDefaults__")

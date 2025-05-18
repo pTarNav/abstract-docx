@@ -18,10 +18,11 @@ class EffectiveStructureFromOoxml(ArbitraryBaseModel):
 		effective_styles_from_ooxml: EffectiveStylesFromOoxml = EffectiveStylesFromOoxml.normalization(
 			ooxml_styles=ooxml_docx.structure.styles
 		)
+		
 		effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml = EffectiveNumberingsFromOoxml.normalization(
 			ooxml_numberings=ooxml_docx.structure.numberings, effective_styles_from_ooxml=effective_styles_from_ooxml
 		)
-
+		
 		effective_document_from_ooxml: EffectiveDocumentFromOoxml = EffectiveDocumentFromOoxml.normalization(
 			ooxml_document=ooxml_docx.structure.document,
 			effective_styles_from_ooxml=effective_styles_from_ooxml,

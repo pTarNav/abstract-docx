@@ -13,8 +13,7 @@ import ooxml_docx.structure.properties as OOXML_PROPERTIES
 class FontSize(float):
 	@classmethod
 	def default(cls) -> FontSize:
-		# ! TODO: investigate further about default font size
-		return cls(1.0)
+		return cls(22.0)
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontSize]:

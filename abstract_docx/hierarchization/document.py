@@ -19,6 +19,13 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 		and prev_block.format.index is not None 
 		and curr_block.format.index.numbering == prev_block.format.index.numbering
 	)
+
+	if curr_block.id == 55:
+		print("prev", prev_block.id, prev_style_priority_level)
+		print("curr", curr_block.id, curr_style_priority_level)
+		print("share numbering", shared_numbering)
+		print(prev_block.format.style)
+		print(curr_block.format.style)
 	
 	# (I know this could be optimized into an if tree with only 3 outcomes, but this is more readable... :D)
 	if shared_numbering:
@@ -49,6 +56,7 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 					prev_block.children.append(curr_block)
 				curr_block.parent = prev_block
 			else:
+				raise ValueError("") # TODO
 				# TODO: just raise the error
 				if prev_style_priority_level == curr_style_priority_level:
 					# shared parent
@@ -66,7 +74,7 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 						else:
 							prev_block.children.append(curr_block)
 						curr_block.parent = prev_block
-				# raise ValueError("") # TODO
+				
 				# TODO: ---
 	else:
 		if prev_style_priority_level == curr_style_priority_level:

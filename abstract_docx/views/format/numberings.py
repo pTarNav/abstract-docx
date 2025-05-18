@@ -49,7 +49,12 @@ class MarkerPattern(str):
 		if max(placeholders) not in levels_strings.keys():
 			raise KeyError(f"Incomplete level indexes, missing at least {max(placeholders)=}")
 		
-		return super().format(*list(levels_strings.values()))
+		# Complete missing levels (needed for super().format(...)) with dummy strings
+		complete_ordered_level_strings: list[str] = []
+		for i in range(max(placeholders) + 1):
+			complete_ordered_level_strings.append(levels_strings.get(i, ""))
+
+		return super().format(*complete_ordered_level_strings)
 
 
 def to_letters(n: int) -> str:
@@ -320,7 +325,7 @@ class LevelProperties(ArbitraryBaseModel):
 			case _:
 				# At least one of the level style properties will never be empty.
 				# Because it would mean that it is trying to aggregate a level that neither of the numberings have.
-				# If this happens something has terribly gone wrong.
+				# If this happens something has gone terribly wrong.
 				raise ValueError("")
 
 # TODO change ids to str

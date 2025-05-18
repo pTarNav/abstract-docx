@@ -73,6 +73,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	def _compute_effective_texts(
 			self, ooxml_texts: list[OOXML_RUN.Run | OOXML_PARAGRAPH.Hyperlink], effective_paragraph_style: Style, block_id: int
 		) -> list[Text]:
+
 		effective_texts: list[Text] = []
 		for ooxml_text in ooxml_texts:
 			# Use length of seen content since it may not match the original length due to normalization
@@ -84,6 +85,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				curr_text: Run = self.compute_effective_run(
 					ooxml_run=ooxml_text, effective_paragraph_style=effective_paragraph_style, run_id_str=run_id_str
 				)
+					
 			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):
 				print("Hyperlink")
 
@@ -161,8 +163,10 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# If so pull them into the paragraph style.
 		if len(effective_paragraph_content) > 0:
 			shared_text_run_style_properties: RunStyleProperties = effective_paragraph_content[0].style.properties.run_style_properties
+
 			for i, effective_text in enumerate(effective_paragraph_content[1:]):
 				if len(effective_text.text.strip()) > 0:
+
 					shared_text_run_style_properties = RunStyleProperties(
 						font_size=shared_text_run_style_properties.font_size
 						if shared_text_run_style_properties.font_size == effective_text.style.properties.run_style_properties.font_size
@@ -234,7 +238,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 						)
 					case _:
 						self.possible_levels_matches[block_id] = detected_matches
-
+		
 		effective_paragraph: Paragraph = Paragraph(
 			id=block_id,
 			content=effective_paragraph_content,
@@ -254,7 +258,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			match type(ooxml_block):
 				case OOXML_PARAGRAPH.Paragraph:
 					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
-					self._associate_effective_text_styles
 				case _:
 					# ! TODO: Remove continue
 					continue
