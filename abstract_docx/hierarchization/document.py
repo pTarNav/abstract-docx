@@ -101,9 +101,12 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 			raise ValueError("") # TODO
 		
 		if _computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] is None:
-			_computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] = formats_view.numberings.enumerations[curr_block.format.index.enumeration.id].levels[indentation_level].properties.start 
+			_computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] = formats_view.numberings.enumerations[curr_block.format.index.enumeration.id].levels[indentation_level].properties.start
 		else:
-			_computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] += 1
+			if prev_block.id != -1 and prev_block.format.index is not None and prev_block.format.index.numbering != curr_block.format.index.numbering and curr_block.format.index.level.properties.override_start != -1:  # Start override (change of numbering)
+				_computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] = formats_view.numberings.enumerations[curr_block.format.index.enumeration.id].levels[indentation_level].properties.start
+			else:
+				_computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] += 1
 
 		# Restart logic
 		for level_id in range(indentation_level + 1, len(_computed_numbering_level_indexes[curr_block.format.index.numbering.id].keys())):

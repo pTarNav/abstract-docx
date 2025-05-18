@@ -255,6 +255,7 @@ class LevelOverride(OoxmlElement):
 	"""
 	id: int
 	level: Optional[Level] = None
+	start_override: Optional[int] = None
 
 	# Note that numbering and overridden level are optional in order to facilitate the construction
 	# however, they should not be empty and always associated to a numbering instance and the respective overridden level.
@@ -273,7 +274,8 @@ class LevelOverride(OoxmlElement):
 		return cls(
 			element=ooxml_level_override.element,
 			id=id,
-			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id)
+			level=cls._parse_level(ooxml_level_override=ooxml_level_override, styles=styles, id=id),
+			start_override=cls._parse_start_override(ooxml_level_override=ooxml_level_override)
 		)
 
 	@staticmethod
@@ -298,6 +300,14 @@ class LevelOverride(OoxmlElement):
 			))
 
 		return level
+	
+	@staticmethod
+	def _parse_start_override(ooxml_level_override: OoxmlElement) -> Optional[int]:
+		start_override: Optional[int] = ooxml_level_override.xpath_query(query="./w:startOverride/@w:val", singleton=True)
+		if start_override is not None:
+			start_override = int(start_override)
+		
+		return start_override
 
 
 class Numbering(OoxmlElement):

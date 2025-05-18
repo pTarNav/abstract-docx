@@ -262,6 +262,24 @@ class Restart(int):
 		
 		return cls(int(v))
 
+class OverrideStart(int):
+	"""
+	Special conditions:
+	 - -1: Not defined, should not restart index when changing numberings.
+	"""
+	@classmethod
+	def default(cls) -> OverrideStart:
+		return cls(-1)
+
+	@classmethod
+	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[OverrideStart]:
+		if v is None:
+			if not must_default:
+				return None
+			
+			return cls.default()
+		
+		return cls(int(v))
 
 class LevelProperties(ArbitraryBaseModel):
 	marker_pattern: Optional[MarkerPattern] = None
@@ -269,6 +287,7 @@ class LevelProperties(ArbitraryBaseModel):
 	whitespace: Optional[Whitespace] = None
 	start: Optional[Start] = None
 	restart: Optional[Restart] = None
+	override_start: Optional[OverrideStart] = None
 
 	@classmethod
 	def default(cls) -> LevelProperties:
@@ -277,11 +296,14 @@ class LevelProperties(ArbitraryBaseModel):
 			marker_type=MarkerType.default(),
 			whitespace=Whitespace.default(),
 			start=Start.default(),
-			restart=Restart.default()
+			restart=Restart.default(),
+			override_start=OverrideStart.default()
 		)
 
 	@classmethod
-	def from_ooxml(cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False) -> LevelProperties:
+	def from_ooxml(
+			cls, level: Optional[OOXML_NUMBERINGS.Level], override_start: Optional[int]=None, must_default: bool=False
+		) -> LevelProperties:
 		# TODO: change level with level properties once we figure a way to make level properties easier to access
 		if level is not None:
 			return cls(
@@ -299,7 +321,8 @@ class LevelProperties(ArbitraryBaseModel):
 				),
 				restart=Restart.from_ooxml_val(
 					v=level.xpath_query("./w:lvlRestart/@w:val", singleton=True), must_default=must_default
-				)
+				),
+				override_start=OverrideStart.from_ooxml_val(v=override_start, must_default=must_default)
 			)
 
 		if must_default:	
@@ -316,7 +339,8 @@ class LevelProperties(ArbitraryBaseModel):
 					marker_type=add.marker_type if add.marker_type is not None else agg.marker_type,
 					whitespace=add.whitespace if add.whitespace is not None else agg.whitespace,
 					start=add.start if add.start is not None else agg.start,
-					restart=add.restart if add.restart is not None else agg.restart
+					restart=add.restart if add.restart is not None else agg.restart,
+					override_start=add.override_start if add.override_start is not None else agg.override_start
 				)
 			case True, False:
 				return agg

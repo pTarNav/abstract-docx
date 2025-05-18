@@ -242,7 +242,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				levels={
 					k: Level(
 						id=str(k),
-						properties=LevelProperties.from_ooxml(level=v.level, must_default=must_default),
+						properties=LevelProperties.from_ooxml(level=v.level, override_start=v.start_override, must_default=must_default),
 						style=Style(
 							id=f"__@NUMBERING={ooxml_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
 							properties=StyleProperties.from_ooxml(
