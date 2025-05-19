@@ -66,7 +66,9 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		
 		return effective_numberings_from_ooxml
 
-	def aggregate_effective_enumerations(self, agg_enumeration: Enumeration, add_enumeration: Enumeration) -> Enumeration:
+	def aggregate_effective_enumerations(
+			self, agg_enumeration: Enumeration, add_enumeration: Enumeration, must_default: bool=False
+		) -> Enumeration:
 		effective_default_style: Style = self.effective_styles_from_ooxml.get_default()
 
 		levels: dict[int, Level] = {}
@@ -89,6 +91,12 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					)
 				)
 			)
+
+		# Apply default behavior (must be done after aggregation)
+		if must_default:
+			default_level_properties: Level = LevelProperties.from_ooxml(level=None, must_default=must_default)
+			for level in levels.values():
+				level.properties = LevelProperties.aggregate_ooxml(agg=default_level_properties, add=level.properties)
 
 		return Enumeration(id=add_enumeration.id, levels=levels)
 	
@@ -211,7 +219,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				levels={
 					k: Level(
 						id=str(k),
-						properties=LevelProperties.from_ooxml(level=v, must_default=must_default),
+						properties=LevelProperties.from_ooxml(level=v),
 						style=Style(
 							id=f"__@ABSTRACT_NUMBERING={ooxml_abstract_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
 							properties=StyleProperties.from_ooxml(
@@ -229,20 +237,21 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				# Aggregate: (effective_enumeration_style) + effective_abstract_enumeration => agg_effective_abstract_enumeration
 				agg_effective_abstract_enumeration: Enumeration = self.aggregate_effective_enumerations(
 					agg_enumeration=effective_enumeration_style,
-					add_enumeration=effective_abstract_enumeration
+					add_enumeration=effective_abstract_enumeration,
+					must_default=must_default
 				)
 			else:
 				agg_effective_abstract_enumeration = effective_abstract_enumeration
 			
 			self._discovered_effective_abstract_enumerations[agg_effective_abstract_enumeration.id] = agg_effective_abstract_enumeration
-		
+
 		if ooxml_numbering is not None:
 			effective_enumeration: Enumeration = Enumeration(
 				id=str(ooxml_numbering.id),
 				levels={
 					k: Level(
 						id=str(k),
-						properties=LevelProperties.from_ooxml(level=v.level, override_start=v.start_override, must_default=must_default),
+						properties=LevelProperties.from_ooxml(level=v.level, override_start=v.start_override),
 						style=Style(
 							id=f"__@NUMBERING={ooxml_numbering.id}@LEVEL={v.id}__",  # TODO what if it already exists
 							properties=StyleProperties.from_ooxml(
@@ -259,7 +268,8 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			# Aggregate: agg_effective_abstract_enumeration + effective_enumeration => agg_effective_enumeration
 			agg_effective_enumeration: Enumeration = self.aggregate_effective_enumerations(
 				agg_enumeration=agg_effective_abstract_enumeration,
-				add_enumeration=effective_enumeration
+				add_enumeration=effective_enumeration,
+				must_default=must_default
 			)
 
 			self.effective_enumerations[str(agg_effective_enumeration.id)] = agg_effective_enumeration
@@ -321,7 +331,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		"""
 		self._compute_effective_enumerations()
 		self._associate_effective_level_styles()
-
 		print(len(self.effective_numberings))
 		print(len(self.effective_enumerations))
 		print(len(self.effective_levels))
@@ -406,6 +415,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def deduplicate(self) -> None:
 		self._deduplicate_levels()
 		self._associate_deduplicated_levels()
+		
 		self._deduplicate_enumerations()
 		self._associate_deduplicated_enumerations()
 

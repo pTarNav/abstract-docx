@@ -130,6 +130,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		return matches
 
 	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
+
 		if ooxml_paragraph.properties is not None:
 			effective_paragraph_style: Style = Style(
 				id=f"__@PARAGRAPH={block_id}__",
