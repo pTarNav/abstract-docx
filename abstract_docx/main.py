@@ -29,6 +29,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	_effective_structure: Optional[EffectiveStructureFromOoxml] = None
 	_views: Optional[AbstractDocxViews] = None
 
+	_document_root: Optional[Block] = None
+
 	@classmethod
 	def read(cls, file_path: str) -> AbstractDocx:
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
@@ -52,6 +54,13 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		raise ValueError("Please call")
 
+	@property
+	def document_root(self) -> Block:
+		if self._document_root is not None:
+			return self._document_root
+
+		raise ValueError("Please call")
+
 	def hierarchization(self) -> Block:
 		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles.effective_styles)
 		return document_hierarchization(effective_document=self._effective_structure.document.effective_document, formats_view=FormatsView(styles=styles_view, numberings=self._effective_structure.numberings.effective_numberings))
@@ -62,9 +71,9 @@ class AbstractDocx(ArbitraryBaseModel):
 		"""
 
 		self.normalization()
-		document_root: Block = self.hierarchization()
+		self._document_root: Block = self.hierarchization()
 		
-		self.print(document_root=document_root)
+		self.print(document_root=self._document_root)
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, metadata: bool = False) -> None:
 		
