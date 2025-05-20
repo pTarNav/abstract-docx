@@ -250,7 +250,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			match type(ooxml_block):
 				case OOXML_PARAGRAPH.Paragraph:
 					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
-					self._associate_effective_text_styles
 				case _:
 					# ! TODO: Remove continue
 					continue

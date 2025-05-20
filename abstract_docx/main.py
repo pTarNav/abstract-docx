@@ -113,8 +113,19 @@ class AbstractDocx(ArbitraryBaseModel):
 		self._print_document(curr_block=document_root, prev_tree_node=tree_root)
 		print(rich_tree_to_str(tree_root))
 	
+	def _to_text(self, block: Block, depth: int=0) -> str:
+		s = "\t"*depth
+		if block.level_indexes:
+			s += 
+		if isinstance(block, Paragraph):
+			s += repr(block)
+		else:
+			s += "@WORK_IN_PROGRESS@"
+
+	def to_txt(self) -> None:
+		pass
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[2]}.docx")
 	x()	
