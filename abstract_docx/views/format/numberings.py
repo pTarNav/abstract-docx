@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum
 
 import re
@@ -49,7 +49,12 @@ class MarkerPattern(str):
 		if max(placeholders) not in levels_strings.keys():
 			raise KeyError(f"Incomplete level indexes, missing at least {max(placeholders)=}")
 		
-		return super().format(*list(levels_strings.values()))
+		# Complete missing levels (needed for super().format(...)) with dummy strings
+		complete_ordered_level_strings: list[str] = []
+		for i in range(max(placeholders) + 1):
+			complete_ordered_level_strings.append(levels_strings.get(i, ""))
+
+		return super().format(*complete_ordered_level_strings)
 
 
 def to_letters(n: int) -> str:
@@ -257,6 +262,24 @@ class Restart(int):
 		
 		return cls(int(v))
 
+class OverrideStart(int):
+	"""
+	Special conditions:
+	 - -1: Not defined, should not restart index when changing numberings.
+	"""
+	@classmethod
+	def default(cls) -> OverrideStart:
+		return cls(-1)
+
+	@classmethod
+	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[OverrideStart]:
+		if v is None:
+			if not must_default:
+				return None
+			
+			return cls.default()
+		
+		return cls(int(v))
 
 class LevelProperties(ArbitraryBaseModel):
 	marker_pattern: Optional[MarkerPattern] = None
@@ -264,6 +287,7 @@ class LevelProperties(ArbitraryBaseModel):
 	whitespace: Optional[Whitespace] = None
 	start: Optional[Start] = None
 	restart: Optional[Restart] = None
+	override_start: Optional[OverrideStart] = None
 
 	@classmethod
 	def default(cls) -> LevelProperties:
@@ -272,11 +296,14 @@ class LevelProperties(ArbitraryBaseModel):
 			marker_type=MarkerType.default(),
 			whitespace=Whitespace.default(),
 			start=Start.default(),
-			restart=Restart.default()
+			restart=Restart.default(),
+			override_start=OverrideStart.default()
 		)
 
 	@classmethod
-	def from_ooxml(cls, level: Optional[OOXML_NUMBERINGS.Level], must_default: bool=False) -> LevelProperties:
+	def from_ooxml(
+			cls, level: Optional[OOXML_NUMBERINGS.Level], override_start: Optional[int]=None, must_default: bool=False
+		) -> LevelProperties:
 		# TODO: change level with level properties once we figure a way to make level properties easier to access
 		if level is not None:
 			return cls(
@@ -294,14 +321,13 @@ class LevelProperties(ArbitraryBaseModel):
 				),
 				restart=Restart.from_ooxml_val(
 					v=level.xpath_query("./w:lvlRestart/@w:val", singleton=True), must_default=must_default
-				)
+				),
+				override_start=OverrideStart.from_ooxml_val(v=override_start, must_default=must_default)
 			)
 
-		if must_default:
-			print(None, "defaulted")
+		if must_default:	
 			return cls.default()
 		
-		print(None, None)
 		return cls()
 
 	@classmethod
@@ -313,7 +339,8 @@ class LevelProperties(ArbitraryBaseModel):
 					marker_type=add.marker_type if add.marker_type is not None else agg.marker_type,
 					whitespace=add.whitespace if add.whitespace is not None else agg.whitespace,
 					start=add.start if add.start is not None else agg.start,
-					restart=add.restart if add.restart is not None else agg.restart
+					restart=add.restart if add.restart is not None else agg.restart,
+					override_start=add.override_start if add.override_start is not None else agg.override_start
 				)
 			case True, False:
 				return agg
@@ -322,23 +349,33 @@ class LevelProperties(ArbitraryBaseModel):
 			case _:
 				# At least one of the level style properties will never be empty.
 				# Because it would mean that it is trying to aggregate a level that neither of the numberings have.
-				# If this happens something has terribly gone wrong.
+				# If this happens something has gone terribly wrong.
 				raise ValueError("")
 
+# TODO change ids to str
+
 class Level(ArbitraryBaseModel):
-	id: int
+	id: str
 
 	properties: LevelProperties
 	style: Style
 
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Level):
+			return self.properties == v.properties and self.style == v.style
+		
+		raise ValueError("") # TODO
 
-class Numbering(ArbitraryBaseModel):
-	id: int
+class Enumeration(ArbitraryBaseModel):
+	id: str
 
 	levels: dict[int, Level]
 
-	parent: Optional[Numbering] = None
-	children: Optional[list[Numbering]] = None
+	def __eq__(self, v: Any) -> bool:
+		if isinstance(v, Enumeration):
+			return self.levels == v.levels
+		
+		raise ValueError("") # TODO
 
 	def format(self, level_indexes: dict[int, int]) -> str:
 		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
@@ -359,7 +396,6 @@ class Numbering(ArbitraryBaseModel):
 		level_regexes: dict[int, Optional[re.Pattern]] = {}
 		for k, v in self.levels.items():
 			level_indexes_regexes[k] = v.properties.marker_type.detection_regex()
-
 			if (
 				v.properties.marker_pattern is not None
 				 and v.properties.marker_type is not None
@@ -407,5 +443,17 @@ class Numbering(ArbitraryBaseModel):
 							matches["regex_only"].append(level)
 		
 		return matches
-		
-		
+	
+
+class Numbering(ArbitraryBaseModel):
+	id: int
+
+	enumerations: dict[str, Enumeration]
+	
+	counter: Optional[dict[str, int]] = None
+
+
+class Index(ArbitraryBaseModel):
+	numbering: Numbering
+	enumeration: Enumeration
+	level: Level

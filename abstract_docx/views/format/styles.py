@@ -13,8 +13,7 @@ import ooxml_docx.structure.properties as OOXML_PROPERTIES
 class FontSize(float):
 	@classmethod
 	def default(cls) -> FontSize:
-		# ! TODO: investigate further about default font size
-		return cls(1.0)
+		return cls(22.0)
 
 	@classmethod
 	def from_ooxml_val(cls, v: Optional[str], must_default: bool=False) -> Optional[FontSize]:
@@ -206,6 +205,20 @@ class RunStyleProperties(ArbitraryBaseModel):
 			italic=default.italic or Italic(bool(add.italic) ^ agg.italic),
 			underline=default.underline or Underline(bool(add.underline) ^ agg.underline)
 		)
+	
+	def patch(self, other: RunStyleProperties) -> None:
+		if other.font_size is not None:
+			self.font_size = other.font_size
+		if other.font_color is not None:
+			self.font_color = other.font_color
+		if other.font_script is not None:
+			self.font_script = other.font_script
+		if other.bold is not None:
+			self.bold = other.bold
+		if other.italic is not None:
+			self.italic = other.italic
+		if other.underline is not None:
+			self.underline = other.underline
 
 class Justification(Enum):
 	"""
@@ -404,4 +417,5 @@ class Style(ArbitraryBaseModel):
 	def __eq__(self, v: Any) -> bool:
 		if isinstance(v, Style):
 			return self.properties == v.properties
-		return None
+		
+		raise ValueError("") # TODO
