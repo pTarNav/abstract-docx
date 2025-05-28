@@ -449,8 +449,6 @@ class Numbering(ArbitraryBaseModel):
 	id: int
 
 	enumerations: dict[str, Enumeration]
-	
-	counter: Optional[dict[str, int]] = None
 
 
 class Index(ArbitraryBaseModel):

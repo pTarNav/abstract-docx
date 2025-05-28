@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+import json
 
 from utils.pydantic import ArbitraryBaseModel
 
@@ -130,17 +131,31 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 	def _to_text(self, block: Block, depth: int=0) -> str:
 		s = "\t"*depth
-		if block.level_indexes:
-			s += 
+		if block.level_indexes is not None:
+			s += block.format.index.enumeration.format(level_indexes=block.level_indexes)
 		if isinstance(block, Paragraph):
-			s += repr(block)
+			s += str(block)
 		else:
 			s += "@WORK_IN_PROGRESS@"
+		s += "\n"
+		
+		if block.children is not None:
+			for child in block.children:
+				s += self._to_text(block=child, depth=depth+1)
+		
+		return s
 
 	def to_txt(self) -> None:
-		pass
+		s = ""
+		for root in self.document_root.children:
+			s += self._to_text(block=root)
+		
+		with open(f"{self.file_path}.txt", "w+", encoding="utf-8") as f:
+			f.write(s)
+
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
 	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[2]}.docx")
-	x()	
+	x()
+	x.to_txt()
