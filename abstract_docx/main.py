@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+import json
 
 from utils.pydantic import ArbitraryBaseModel
 
@@ -30,6 +31,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	_effective_structure: Optional[EffectiveStructureFromOoxml] = None
 	_views: Optional[AbstractDocxViews] = None
 
+	_document_root: Optional[Block] = None
+
 	@classmethod
 	def read(cls, file_path: str) -> AbstractDocx:
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
@@ -53,6 +56,13 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		raise ValueError("Please call")
 
+	@property
+	def document_root(self) -> Block:
+		if self._document_root is not None:
+			return self._document_root
+
+		raise ValueError("Please call")
+
 	def hierarchization(self) -> Block:
 		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles)
 		numberings_view: NumberingsView = numberings_hierarchization(
@@ -70,9 +80,9 @@ class AbstractDocx(ArbitraryBaseModel):
 		"""
 
 		self.normalization()
-		document_root: Block = self.hierarchization()
+		self._document_root: Block = self.hierarchization()
 		
-		self.print(document_root=document_root, include_metadata=False)
+		self.print(document_root=self._document_root)
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		
@@ -119,8 +129,61 @@ class AbstractDocx(ArbitraryBaseModel):
 		self._print_document(curr_block=document_root, prev_tree_node=tree_root, include_metadata=include_metadata)
 		print(rich_tree_to_str(tree_root))
 	
+	def _to_text(self, block: Block, depth: int=0) -> str:
+		s = "\t"*depth
+		if block.level_indexes is not None:
+			s += block.format.index.enumeration.format(level_indexes=block.level_indexes)
+		if isinstance(block, Paragraph):
+			s += str(block)
+		else:
+			s += "@WORK_IN_PROGRESS@"
+		s += "\n"
+		
+		if block.children is not None:
+			for child in block.children:
+				s += self._to_text(block=child, depth=depth+1)
+		
+		return s
+
+	def to_txt(self) -> None:
+		s: str = ""
+		for root in self.document_root.children:
+			s += self._to_text(block=root)
+		
+		with open(f"{self.file_path}.txt", "w+", encoding="utf-8") as f:
+			f.write(s)
+
+	def _to_json(self, block: Block) -> dict:
+		data: dict = {"id": block.id}
+
+		if block.level_indexes is not None:
+			data["numbering_str"] = block.format.index.enumeration.format(level_indexes=block.level_indexes)
+		
+		if isinstance(block, Paragraph):
+			data["text"] = str(block)
+		else:
+			data["text"] = "@WORK_IN_PROGRESS@"
+
+		if block.children is not None:
+			data["children"] = []
+			for child in block.children:
+				data["children"].append(self._to_json(block=child))
+		
+		return data
+
+	def to_json(self) -> None:
+		root_data: dict = {"id": -1, "text": "__ROOT__", "children": []}
+		for child in self.document_root.children:
+			root_data["children"].append(self._to_json(block=child))
+
+		json_data = json.dumps(root_data, indent=4)
+
+		with open(f"{self.file_path}.json", "w+", encoding="utf-8") as f:
+			f.write(json_data)
+
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/{test_files[2]}.docx")
-	x()	
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[3]}.docx")
+	x()
+	x.to_json()
