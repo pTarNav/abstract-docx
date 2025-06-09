@@ -350,10 +350,45 @@ class ParagraphStyleProperties(ArbitraryBaseModel):
 			)
 		)
 
-
-class TableStyleProperties(ArbitraryBaseModel):
+class LineSize(float):
 	pass
 
+class LineColor(Color):
+	pass
+
+class LineStyle(Enum):
+	# TODO: Make it more flexible
+	NONE = "none"
+	SINGLE = "single"
+	DOUBLE = "double"
+	TRIPLE = "triple"
+	DASHED = "dashed"
+	DOTTED = "dotted"
+	DOTTED_AND_DASHED = "dotted_and_dashed"
+	WAVE = "wave"
+	THIN = "thin"
+	THICK = "thick"
+
+class Border(ArbitraryBaseModel):
+	line_size: LineSize
+	line_color: LineColor
+	line_style: LineStyle
+
+class TableBorders(ArbitraryBaseModel):
+	top: Optional[Border] = None
+	bottom: Optional[Border] = None
+	start: Optional[Border] = None
+	end: Optional[Border] = None
+	inside_horizontal: Optional[Border] = None
+	inside_vertical: Optional[Border] = None
+
+class CellShade(Color):
+	pass
+
+class TableStyleProperties(ArbitraryBaseModel):
+	# TODO: Conditional formatting
+	borders: TableBorders
+	cell_shade: CellShade
 
 class StyleProperties(ArbitraryBaseModel):
 	"""

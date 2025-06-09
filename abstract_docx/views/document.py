@@ -8,6 +8,17 @@ from abstract_docx.views.format.styles import Style
 
 import ooxml_docx.document.run as OOXML_RUN
 
+class Block(ArbitraryBaseModel):
+	id: int
+	format: Optional[Format] = None  # Only the root block of the document will have empty format
+
+	parent: Optional[Block] = None
+	children: Optional[list[Block]] = None
+
+	# TODO: put level indexes inside index
+	level_indexes: Optional[dict[int, int]] = None
+
+# TODO: change Text for Run
 class Text(ArbitraryBaseModel):
 	text: str
 	style: Style
@@ -24,22 +35,14 @@ class Text(ArbitraryBaseModel):
 			raise ValueError("Cannot concatenate two Texts that do not share the same style properties.")
 
 		self.text += other.text
-	
+
+
 class Run(Text):
 	pass
 
+
 class Hyperlink(Text):
 	target: str
-
-
-class Block(ArbitraryBaseModel):
-	id: int
-	format: Optional[Format] = None  # Only the root block of the document will have empty format
-
-	parent: Optional[Block] = None
-	children: Optional[list[Block]] = None
-
-	level_indexes: Optional[dict[int, int]] = None
 
 
 class Paragraph(Block):
@@ -47,4 +50,22 @@ class Paragraph(Block):
 
 	def __str__(self):
 		return "".join([content.text for content in self.content])
-	
+
+class CellMergeRange(ArbitraryBaseModel):
+	start_row_loc: int
+	start_column_loc: int
+	row_span: int
+	column_span: int
+
+class Cell(ArbitraryBaseModel):
+	loc: int
+	blocks: list[Block]
+
+class Row(ArbitraryBaseModel):
+	loc: int
+	cells: list[Cell]
+
+class Table(Block):
+	rows: list[Row]
+	cell_merge_ranges: Optional[list[CellMergeRange]] = None
+	caption: Optional[Paragraph] = None

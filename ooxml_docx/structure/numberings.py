@@ -7,7 +7,7 @@ from rich.tree import Tree
 from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
-from ooxml_docx.structure.properties import RunProperties, ParagraphProperties, NumberingProperties
+from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
 from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle
 
 
