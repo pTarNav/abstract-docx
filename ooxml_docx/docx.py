@@ -26,6 +26,7 @@ class OoxmlDocxStructure(ArbitraryBaseModel):
 		)
 		
 		document_relationships = OoxmlRelationships.parse(ooxml_rels=docx.ooxml.content["word"].relationships.content["document.xml.rels"].ooxml)
+		
 		document = OoxmlDocument.build(
 			ooxml_document_part=docx.ooxml.content["word"].content["document.xml"], 
 			styles=styles, numberings=numberings, relationships=document_relationships

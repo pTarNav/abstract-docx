@@ -82,7 +82,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		self.normalization()
 		self._document_root: Block = self.hierarchization()
 		
-		self.print(document_root=self._document_root)
+		#self.print(document_root=self._document_root)
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		

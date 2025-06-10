@@ -16,8 +16,10 @@ from ooxml_docx.structure.document import OoxmlDocument
 from utils.pydantic import ArbitraryBaseModel
 
 
-# ! TODO: Rework this to only contain the possible levels, one should be able to trace back the possible numberings and enumerations through them
-PossibleIndexMatches = dict[int, dict[str, dict[str, list[Level]]]]
+class ImplicitIndexMatches(ArbitraryBaseModel):
+	numberings: list[Numbering]
+	enumerations: list[Enumeration]
+	levels: list[Level]
 
 class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	ooxml_document: OoxmlDocument
@@ -26,7 +28,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	effective_styles_from_ooxml: EffectiveStylesFromOoxml
 	effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml
 
-	possible_levels_matches: dict[int, PossibleIndexMatches] = {}
+	implicit_index_matches: dict[int, ImplicitIndexMatches] = {}
 
 	@classmethod
 	def normalization(
@@ -46,6 +48,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		return effective_document_from_ooxml
 	
 	def compute_effective_run(self, ooxml_run: OOXML_RUN.Run, effective_paragraph_style: Style, run_id_str: str) -> Run:
+		
 		if ooxml_run.style is not None:
 			effective_run_style: Style = Style(
 				id=run_id_str,
@@ -100,34 +103,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					effective_texts.append(curr_text)
 		
 		return effective_texts
-	
-	def _n_matches(self, matches: PossibleIndexMatches) -> int:
-		return len(set(
-			level
-			for enumeration_matches in matches.values()
-			for detection_dict in enumeration_matches.values()
-			for detected_levels in detection_dict()
-			for level in detected_levels
-		))
-
-	def _possible_levels_detection(self, effective_paragraph_content: list[Text]) -> PossibleIndexMatches:
-		# Join all the text inside the paragraph content (keeping only the style of the first element).
-		# This is to avoid false negatives in the level detection.
-		full_text: Text = Text(text="".join([t.text for t in effective_paragraph_content]), style=effective_paragraph_content[0].style)
-
-		enumeration_matches: dict[str, dict[str, list[Level]]] = {}	
-		for effective_enumeration in self.effective_numberings_from_ooxml.effective_enumerations.values():
-			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(text=full_text)
-			if sum([len(v) for v in effective_enumeration_matches.values()]) > 0:  # Not empty
-				enumeration_matches[effective_enumeration.id] = effective_enumeration_matches
-
-		matches: PossibleIndexMatches = {}
-		for effective_numbering in self.effective_numberings_from_ooxml.effective_numberings.values():
-			for effective_enumeration_id, possible_level_matches in enumeration_matches.items():
-				if effective_enumeration_id in effective_numbering.enumerations.keys():
-					matches[effective_numbering.id][effective_enumeration_id] = possible_level_matches
-		
-		return matches
 
 	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
 
@@ -198,52 +173,11 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		#  - Paragraph occupies more than just 1 line:
 		#  		- Whitespace detected only at the beginning: The whitespace is pulled into the first indentation.
 		#  		- Whitespace detected repeatedly for each line: The whitespace is pulled into the start indentation.
-
-		# TODO Look for any style - numbering association
-
-		effective_paragraph_index: Optional[Index] = None
-		if len(effective_paragraph_content) > 0:
-			# Case: Index associated through the block (or block style)
-			if ooxml_paragraph.numbering is not None:
-				effective_paragraph_index: Index = self.effective_numberings_from_ooxml.get_index(
-					ooxml_abstract_numbering_id=ooxml_paragraph.numbering.abstract_numbering.id,
-					ooxml_numbering_id=ooxml_paragraph.numbering.id,
-					ooxml_level_id=ooxml_paragraph.indentation_level
-				)
-			else:
-				# Possible outcomes and meanings:
-				# - If no matches are detected then the paragraph is certain to not have any numbering associated.				
-				# - If there is only 1 match detected it means that there is no uncertainty that it is associated.
-				# - If there is more than 1 match, cannot do any decision with certainty.
-				detected_matches: PossibleIndexMatches = self._possible_levels_detection(
-					effective_paragraph_content=effective_paragraph_content,
-				)
-				
-				match self._n_matches(matches=detected_matches):
-					case 0:
-						pass
-					case 1:
-						effective_numbering_id, effective_enumeration_id, detection_type, effective_level = next(
-							(effective_numbering_id, effective_enumeration_id, detection_type, next(effective_levels_list))
-							for effective_numbering_id, enumeration_detected_matches in detected_matches.items()
-							for effective_enumeration_id, detection_dict in enumeration_detected_matches.items()
-							for detection_type, effective_levels_list in detection_dict.items()
-						)
-						# TODO the prints would be nice to have in debug mode
-						print(f"Unique index detected for block: {block_id} (with {detection_type} => numbering: {effective_numbering_id}, enumeration: {effective_enumeration_id}, level: {effective_level.id})")
-
-						effective_paragraph_index: Index = Index(
-							numbering=self.effective_numberings_from_ooxml.effective_numberings[effective_numbering_id],
-							enumeration=self.effective_numberings_from_ooxml.effective_enumerations[effective_enumeration_id],
-							level=effective_level
-						)
-					case _:
-						self.possible_levels_matches[block_id] = detected_matches
 		
 		effective_paragraph: Paragraph = Paragraph(
 			id=block_id,
 			content=effective_paragraph_content,
-			format=Format(style=effective_paragraph_style, index=effective_paragraph_index)
+			format=Format(style=effective_paragraph_style)
 		)
 		# print()
 		# print(effective_paragraph)
@@ -264,6 +198,19 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					continue
 					raise ValueError(f"Unexpected ooxml block: {type(ooxml_block)}>")
 
+	def _associate_effective_text_styles(self, effective_texts: list[Text]) -> None:
+		# TODO: Optimize this loop so the inner effective styles loop is only done once
+		for effective_text in effective_texts:
+			found_effective_style_match: bool = False
+			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
+				if effective_text.style == effective_style:
+					effective_text.style = effective_style
+					found_effective_style_match = True
+					break
+			
+			if not found_effective_style_match:
+				self.effective_styles_from_ooxml.effective_styles[effective_text.style.id] = effective_text.style
+
 	def _associate_effective_block_styles(self) -> None:
 		"""_summary_
 		"""
@@ -282,20 +229,183 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			if isinstance(effective_block, Paragraph):
 				self._associate_effective_text_styles(effective_texts=effective_block.content)
 
-	def _associate_effective_text_styles(self, effective_texts: list[Text]) -> None:
-		# TODO: Optimize this loop so the inner effective styles loop is only done once
-		for effective_text in effective_texts:
-			found_effective_style_match: bool = False
-			for effective_style in self.effective_styles_from_ooxml.effective_styles.values():
-				if effective_text.style == effective_style:
-					effective_text.style = effective_style
-					found_effective_style_match = True
-					break
-			
-			if not found_effective_style_match:
-				self.effective_styles_from_ooxml.effective_styles[effective_text.style.id] = effective_text.style
+	@staticmethod
+	def _n_matches(matches: dict[str, dict[str, list[Level]]], only_styles: bool = False) -> int:
+		if not only_styles:
+			return len(set(
+				level.id
+				for enumeration_matches in matches.values()
+				for detected_levels in enumeration_matches.values()
+				for level in detected_levels
+			))
 
+		return len(set(
+			level.id
+			for enumeration_matches in matches.values()
+			for level in enumeration_matches["regex_and_style"]
+		))
+
+	def _resolve_enumerations_associated_numberings(self, enumerations: list[Enumeration]) -> list[Numbering]:
+		associated_numbering_ids: set[int] = set()
+		for numbering_id, numbering in self.effective_numberings_from_ooxml.effective_numberings.items():
+			if any(enumeration.id in set(numbering.enumerations.keys()) for enumeration in enumerations):
+				associated_numbering_ids.add(numbering_id)
+
+		# TODO: Raise error if end list has len() == 0
+		return [
+			self.effective_numberings_from_ooxml.effective_numberings[associated_numbering_id] 
+			for associated_numbering_id in list(associated_numbering_ids)
+		]
+	
+	def _implicit_index_detection_with_fixed_enumeration_and_level(
+			self, enumeration: Enumeration, level: Level
+		) -> Index | ImplicitIndexMatches:
+		"""_summary_
+
+		:param enumeration: _description_
+		:param level: _description_
+		:return: _description_
+		"""
+		numberings: list[Numbering] = self._resolve_enumerations_associated_numberings(enumerations=[enumeration])
+
+		# If only one associated numbering has been resolved, complete Index found
+		if len(numberings) == 1:
+			return Index(numbering=numberings[0], enumeration=enumeration, level=level)
+		else:
+			return ImplicitIndexMatches(numberings=numberings, enumerations=[enumeration], levels=[level])
+
+	def _implicit_index_detection_with_fixed_level(
+			self, enumerations: list[Enumeration], level: Level
+		) -> ImplicitIndexMatches:
+		"""_summary_
+
+		:param level: _description_
+		:return: _description_
+		"""
+		numberings: list[Numbering] = self._resolve_enumerations_associated_numberings(enumerations=enumerations)
+		return ImplicitIndexMatches(numberings=numberings, enumerations=enumerations, levels=[level])
+	
+	def _implicit_index_detection_with_none_fixed(
+			self, enumerations: list[Enumeration], levels: list[Level]
+		) -> ImplicitIndexMatches:
+		"""_summary_
+
+		:param enumerations: _description_
+		:param levels: _description_
+		:return: _description_
+		"""
+		numberings: list[Numbering] = self._resolve_enumerations_associated_numberings(enumerations=enumerations)
+		return ImplicitIndexMatches(numberings=numberings, enumerations=enumerations, levels=levels)
+
+	def _implicit_index_detection(self, effective_paragraph_content: list[Text]) -> Optional[Index | ImplicitIndexMatches]:
+		# Join all the text inside the paragraph content (keeping only the style of the first element).
+		# This is to avoid false negatives in the level detection.
+		full_text: Text = Text(text="".join([t.text for t in effective_paragraph_content]), style=effective_paragraph_content[0].style)
+
+		matches: dict[str, dict[str, list[Level]]] = {}
+		for effective_enumeration in self.effective_numberings_from_ooxml.effective_enumerations.values():
+			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(text=full_text)
+			if self._n_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
+				matches[effective_enumeration.id] = effective_enumeration_matches
+		
+		print("DETECTED MATCHES", self._n_matches(matches=matches))
+		# TODO: Document cases better
+		match self._n_matches(matches=matches):
+			case 0:
+				return None
+			case 1:
+				enumeration_id, enumeration_match = next(iter(matches.items()))
+				return self._implicit_index_detection_with_fixed_enumeration_and_level(
+					enumeration=self.effective_numberings_from_ooxml.effective_enumerations[enumeration_id],
+					# For now, do not worry about regex_only case possibly being a false positive
+					level=(enumeration_match["regex_and_style"] + enumeration_match["regex_only"])[0]
+				)
+				
+			case _:
+				match self._n_matches(matches=matches, only_styles=True):
+					case 0:
+						unique_level_ids: set[str] = set()
+						enumerations: list[Enumeration]	= []
+						for enumeration_id, enumeration_match in matches.items():
+							unique_level_ids.update(level.id for level in enumeration_match["regex_only"])						
+							enumerations.append(self.effective_numberings_from_ooxml.effective_enumerations[enumeration_id])
+
+						if len(unique_level_ids) == 1:
+							return self._implicit_index_detection_with_fixed_level(
+								enumerations=enumerations, level=list(unique_level_ids)[0]
+							)
+
+						for level_id in list(unique_level_ids):
+							print(level_id, type(level_id))
+						return self._implicit_index_detection_with_none_fixed(
+							enumerations=enumerations,
+							levels=[
+								self.effective_numberings_from_ooxml.effective_levels[level_id]
+								for level_id in list(unique_level_ids)
+							]
+						)
+					case 1:
+						for enumeration_id, enumeration_match in matches.items():
+							if len(enumeration_match["regex_and_style"]) == 1:
+								return self._implicit_index_detection_with_fixed_enumeration_and_level(
+									enumeration=self.effective_numberings_from_ooxml.effective_enumerations[enumeration_id],
+									level=enumeration_match["regex_and_style"][0]
+								)
+					case _:
+						enumerations_with_style_matches: list[Enumeration] = [
+							self.effective_numberings_from_ooxml.effective_enumerations[enum_id]
+							for enum_id, enum_match in matches.items()
+							if len(enum_match["regex_and_style"]) != 0
+						]
+						
+						# Because of the style condition of deduplication of levels, it will always be the same level
+						return self._implicit_index_detection_with_fixed_level(
+							enumerations=enumerations_with_style_matches,
+							level=matches[enumerations_with_style_matches[0].id]["regex_and_style"][0]
+						)						
+
+		# TODO
+		raise ValueError()
+
+	def _associate_effective_block_numberings(self) -> None:
+
+		for effective_block in self.effective_document.values():
+			# TODO: Add typehint for ooxml table
+			ooxml_block: OOXML_PARAGRAPH.Paragraph = self.ooxml_document.body[effective_block.id]
+
+			# TODO Look for any style - numbering association
+			if ooxml_block.numbering is not None:
+				# Case: Index associated through the block (or block style)
+				effective_block_index: Index = self.effective_numberings_from_ooxml.get_index(
+					ooxml_abstract_numbering_id=ooxml_block.numbering.abstract_numbering.id,
+					ooxml_numbering_id=ooxml_block.numbering.id,
+					ooxml_level_id=ooxml_block.indentation_level
+				)
+
+				effective_block.format.index = effective_block_index
+			elif isinstance(effective_block, Paragraph): # Do not try to find implicit enumerations and levels matches for other block types
+				if len(effective_block.content) > 0:
+					# Possible outcomes and meanings:
+					# - If no matches are detected then the paragraph is certain to not have any numbering associated.				
+					
+					detected_index_matches: Optional[Index | ImplicitIndexMatches] = self._implicit_index_detection(
+						effective_paragraph_content=effective_block.content
+					)
+
+					if detected_index_matches is not None:
+						if isinstance(detected_index_matches, Index):
+							print("CONSTRUCTED AN ACTUAL INDEX")
+							effective_block.format.index = detected_index_matches
+						else:
+							print("IMPLICIT")
+							print("numberings", [x.id for x in detected_index_matches.numberings])
+							print("enumerations", [x.id for x in detected_index_matches.enumerations])
+							print("levels", [x.id for x in detected_index_matches.levels])
+							self.implicit_index_matches[effective_block.id] = detected_index_matches
+					
+					
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		self._associate_effective_block_styles()
+		self._associate_effective_block_numberings()
 	
