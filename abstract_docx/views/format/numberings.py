@@ -461,10 +461,11 @@ class NumberingsView(ArbitraryBaseModel):
 
 	@classmethod
 	def load(
-		cls, numberings: dict[int, Numbering],
+		cls, 
+		numberings: dict[int, Numbering],
 		enumerations: dict[str, Enumeration],
 		levels: dict[str, Level],
-		ordered_levels: list[list[Level]]
+		priority_ordered_levels: list[list[Level]]
 	) -> NumberingsView:
 		return cls(
 			numberings=numberings,
@@ -472,7 +473,7 @@ class NumberingsView(ArbitraryBaseModel):
 			levels=levels,
 			priority_keys={
 				priority_level: [style.id for style in levels_in_priority_level]
-				for priority_level, levels_in_priority_level in enumerate(ordered_levels)
+				for priority_level, levels_in_priority_level in enumerate(priority_ordered_levels)
 			}
 		)
 

@@ -5,8 +5,7 @@ from enum import Enum
 from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.views.format.styles import Style
-from abstract_docx.views.format import StylesView
-from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
+
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 
 
@@ -44,7 +43,10 @@ class StylesPriorityParameters(list):
 		
 		return cls(normalized)
 
-# TODO: Default style priority parameters
+
+DEFAULT_STYLES_PRIORITY_PARAMETERS: StylesPriorityParameters = StylesPriorityParameters.load(
+	priorities=[AvailableStylePriorityParameters.FONT_SIZE, AvailableStylePriorityParameters.BOLD, AvailableStylePriorityParameters.INDENTATION]
+)
 
 class HierarchicalStylesFromOoxml(ArbitraryBaseModel):
 	priority_ordered_styles: list[list[Style]]
@@ -52,13 +54,11 @@ class HierarchicalStylesFromOoxml(ArbitraryBaseModel):
 	effective_structure_from_ooxml: EffectiveStructureFromOoxml
 	styles_priority_parameters: StylesPriorityParameters
 
-	_styles_view: Optional[StylesView] = None
-
 	@classmethod
 	def hierarchization(
 		cls,
 		effective_structure_from_ooxml: EffectiveStructureFromOoxml,
-		styles_priority_parameters: StylesPriorityParameters
+		styles_priority_parameters: StylesPriorityParameters=DEFAULT_STYLES_PRIORITY_PARAMETERS
 	) -> HierarchicalStylesFromOoxml:
 		hierarchical_styles_from_ooxml: HierarchicalStylesFromOoxml = cls(
 			priority_ordered_styles=[],
@@ -140,17 +140,4 @@ class HierarchicalStylesFromOoxml(ArbitraryBaseModel):
 						# Insert style one priority level above of the current priority level (and stop search)
 						priority.insert(i, [effective_style])
 						break
-		
-		self._styles_view = StylesView.load(
-			styles=self.effective_structure_from_ooxml.styles.effective_styles,
-			priority_ordered_styles=self.priority_ordered_styles
-		)
-
-	@property
-	def styles_view(self) -> StylesView:
-		if self._styles_view is not None:
-			return self._styles_view
-		
-		raise ValueError("Please call")
-
 	

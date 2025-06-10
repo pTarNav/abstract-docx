@@ -1,10 +1,37 @@
+from __future__ import annotations
+from typing import Optional
+
+from utils.pydantic import ArbitraryBaseModel
+
+from abstract_docx.views.document import Block
+
+from abstract_docx.normalization import EffectiveStructureFromOoxml
+
+
+class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
+	root: Block
+	effective_structure_from_ooxml: EffectiveStructureFromOoxml
+
+	@classmethod
+	def hierarchization(
+		cls, effective_structure_from_ooxml: EffectiveStructureFromOoxml	
+	) -> HierarchicalDocumentFromOoxml:
+		
+		hierarchical_document_from_ooxml: HierarchicalDocumentFromOoxml = cls(
+			effective_structure_from_ooxml=effective_structure_from_ooxml
+		)
+		hierarchical_document_from_ooxml.compute()
+		
+	def compute(self) -> None:
+		pass
+
+
+
 from enum import Enum
 from abstract_docx.normalization.document import EffectiveDocumentFromOoxml
 from abstract_docx.views.format import FormatsView
 from abstract_docx.views.document import Paragraph, Block
 from abstract_docx.views.format.styles import Style
-
-from typing import Optional
 
 class HierarchizationConflictResolutionParameter(Enum):
 	BOUNDED = "bounded"

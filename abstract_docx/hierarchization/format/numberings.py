@@ -1,13 +1,27 @@
-from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
-from abstract_docx.views.format import NumberingsView, StylesView
+from __future__ import annotations
+from typing import Optional
 
-def numberings_hierarchization(effective_numberings: EffectiveNumberingsFromOoxml, styles_view: StylesView) -> NumberingsView:
+from utils.pydantic import ArbitraryBaseModel
+
+from abstract_docx.views.format.numberings import Numbering, Enumeration, Level
+
+from abstract_docx.normalization import EffectiveStructureFromOoxml
 
 
+class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
+	priority_ordered_levels: list[list[Level]]
+	effective_structure_from_ooxml: EffectiveStructureFromOoxml
 
-	return NumberingsView.load(
-		numberings=effective_numberings.effective_numberings,
-		enumerations=effective_numberings.effective_enumerations,
-		levels=effective_numberings.effective_levels,
-		ordered_levels=[]
-	)
+	@classmethod
+	def hierarchization(
+		cls, effective_structure_from_ooxml: EffectiveStructureFromOoxml	
+	) -> HierarchicalNumberingsFromOoxml:
+		
+		hierarchical_numberings_from_ooxml: HierarchicalNumberingsFromOoxml = cls(
+			priority_ordered_levels=[],
+			effective_structure_from_ooxml=effective_structure_from_ooxml
+		)
+		hierarchical_numberings_from_ooxml.compute()
+		
+	def compute(self) -> None:
+		pass
