@@ -7,6 +7,8 @@ from utils.pydantic import ArbitraryBaseModel
 from ooxml_docx.docx import OoxmlDocx
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
+from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
+
 from abstract_docx.views import AbstractDocxViews
 from abstract_docx.views.document import Block, Paragraph
 from abstract_docx.views.format import StylesView, FormatsView, NumberingsView
@@ -29,8 +31,9 @@ class AbstractDocx(ArbitraryBaseModel):
 	ooxml_docx: OoxmlDocx
 
 	_effective_structure: Optional[EffectiveStructureFromOoxml] = None
-	_views: Optional[AbstractDocxViews] = None
+	_hierarchical_structure: Optional[HierarchicalStructureFromOoxml] = None
 
+	_views: Optional[AbstractDocxViews] = None
 	_document_root: Optional[Block] = None
 
 	@classmethod
@@ -39,8 +42,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		return cls(file_path=file_path, ooxml_docx=ooxml_docx)
 	
-	def normalization(self) -> None:
-		self._effective_structure = EffectiveStructureFromOoxml.normalization(ooxml_docx=self.ooxml_docx)
+	def hierarchization(self) -> None:
 
 	@property
 	def effective_structure(self) -> EffectiveStructureFromOoxml:
@@ -63,26 +65,16 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		raise ValueError("Please call")
 
-	def hierarchization(self) -> Block:
-		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles)
-		numberings_view: NumberingsView = numberings_hierarchization(
-			effective_numberings=self._effective_structure.numberings, styles_view=styles_view
-		)
-
-		return document_hierarchization(
-			effective_document=self._effective_structure.document, 
-			formats_view=FormatsView(styles=styles_view, numberings=numberings_view)
-		)
-
 	def __call__(self, *args, **kwds) -> None:
 		"""
 		In the call function because they can be parametrized
 		"""
 
-		self.normalization()
-		self._document_root: Block = self.hierarchization()
+		self._effective_structure = EffectiveStructureFromOoxml.normalization(ooxml_docx=self.ooxml_docx)
+		self._hierarchical_structure = HierarchicalStructureFromOoxml.hierarchization(
+			effective_structure_from_ooxml=self.effective_structure
+		)
 		
-		#self.print(document_root=self._document_root)
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		

@@ -450,3 +450,32 @@ class Index(ArbitraryBaseModel):
 	numbering: Numbering
 	enumeration: Enumeration
 	level: Level
+
+
+class NumberingsView(ArbitraryBaseModel):
+	numberings: dict[int, Numbering]
+	enumerations: dict[str, Enumeration]
+	levels: dict[str, Level]
+
+	priority_keys: dict[int, list[str]]
+
+	@classmethod
+	def load(
+		cls, numberings: dict[int, Numbering],
+		enumerations: dict[str, Enumeration],
+		levels: dict[str, Level],
+		ordered_levels: list[list[Level]]
+	) -> NumberingsView:
+		return cls(
+			numberings=numberings,
+			enumerations=enumerations,
+			levels=levels,
+			priority_keys={
+				priority_level: [style.id for style in levels_in_priority_level]
+				for priority_level, levels_in_priority_level in enumerate(ordered_levels)
+			}
+		)
+
+	@property
+	def priorities(self) -> dict[int, list[Level]]:
+		return {level: [self.levels[name] for name in levels_keys] for level, levels_keys in self.priority_keys.items()}

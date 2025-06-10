@@ -21,6 +21,7 @@ class ImplicitIndexMatches(ArbitraryBaseModel):
 	enumerations: list[Enumeration]
 	levels: list[Level]
 
+
 class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	ooxml_document: OoxmlDocument
 	effective_document: dict[int, Block]
@@ -335,8 +336,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 								enumerations=enumerations, level=list(unique_level_ids)[0]
 							)
 
-						for level_id in list(unique_level_ids):
-							print(level_id, type(level_id))
 						return self._implicit_index_detection_with_none_fixed(
 							enumerations=enumerations,
 							levels=[
@@ -394,13 +393,8 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 					if detected_index_matches is not None:
 						if isinstance(detected_index_matches, Index):
-							print("CONSTRUCTED AN ACTUAL INDEX")
 							effective_block.format.index = detected_index_matches
 						else:
-							print("IMPLICIT")
-							print("numberings", [x.id for x in detected_index_matches.numberings])
-							print("enumerations", [x.id for x in detected_index_matches.enumerations])
-							print("levels", [x.id for x in detected_index_matches.levels])
 							self.implicit_index_matches[effective_block.id] = detected_index_matches
 					
 					

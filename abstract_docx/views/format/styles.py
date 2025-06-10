@@ -454,3 +454,22 @@ class Style(ArbitraryBaseModel):
 			return self.properties == v.properties
 		
 		raise ValueError("") # TODO
+
+
+class StylesView(ArbitraryBaseModel):
+	styles: dict[str, Style]
+	priority_keys: dict[int, list[str]]
+
+	@classmethod
+	def load(cls, styles: dict[str, Style], priority_ordered_styles: list[list[Style]]) -> StylesView:
+		return cls(
+			styles=styles,
+			priority_keys={
+				priority_level: [style.id for style in styles_in_priority_level]
+				for priority_level, styles_in_priority_level in enumerate(priority_ordered_styles)
+			}
+		)
+
+	@property
+	def priorities(self) -> dict[int, list[Style]]:
+		return {level: [self.styles[name] for name in styles_keys] for level, styles_keys in self.priority_keys.items()}
