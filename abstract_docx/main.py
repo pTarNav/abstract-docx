@@ -7,14 +7,10 @@ from utils.pydantic import ArbitraryBaseModel
 from ooxml_docx.docx import OoxmlDocx
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
+from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
+
 from abstract_docx.views import AbstractDocxViews
 from abstract_docx.views.document import Block, Paragraph
-from abstract_docx.views.format import StylesView, FormatsView, NumberingsView
-
-from abstract_docx.hierarchization.format.styles import styles_hierarchization
-from abstract_docx.hierarchization.format.numberings import numberings_hierarchization
-from abstract_docx.hierarchization.document import document_hierarchization
-
 
 from rich.tree import Tree
 from rich.text import Text as RichText
@@ -29,9 +25,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	ooxml_docx: OoxmlDocx
 
 	_effective_structure: Optional[EffectiveStructureFromOoxml] = None
+	_hierarchical_structure: Optional[HierarchicalStructureFromOoxml] = None
 	_views: Optional[AbstractDocxViews] = None
-
-	_document_root: Optional[Block] = None
 
 	@classmethod
 	def read(cls, file_path: str) -> AbstractDocx:
@@ -39,9 +34,6 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		return cls(file_path=file_path, ooxml_docx=ooxml_docx)
 	
-	def normalization(self) -> None:
-		self._effective_structure = EffectiveStructureFromOoxml.normalization(ooxml_docx=self.ooxml_docx)
-
 	@property
 	def effective_structure(self) -> EffectiveStructureFromOoxml:
 		if self._effective_structure is not None:
@@ -50,39 +42,33 @@ class AbstractDocx(ArbitraryBaseModel):
 		raise ValueError("Please call")
 	
 	@property
-	def views(self) -> EffectiveStructureFromOoxml:
+	def hierarchical_structure(self) -> HierarchicalStructureFromOoxml:
+		if self._hierarchical_structure is not None:
+			return self._hierarchical_structure
+
+		raise ValueError("Please call")
+	
+	@property
+	def views(self) -> AbstractDocxViews:
 		if self._views is not None:
 			return self._views
 
 		raise ValueError("Please call")
 
-	@property
-	def document_root(self) -> Block:
-		if self._document_root is not None:
-			return self._document_root
-
-		raise ValueError("Please call")
-
-	def hierarchization(self) -> Block:
-		styles_view: StylesView = styles_hierarchization(effective_styles=self._effective_structure.styles)
-		numberings_view: NumberingsView = numberings_hierarchization(
-			effective_numberings=self._effective_structure.numberings, styles_view=styles_view
-		)
-
-		return document_hierarchization(
-			effective_document=self._effective_structure.document, 
-			formats_view=FormatsView(styles=styles_view, numberings=numberings_view)
-		)
-
 	def __call__(self, *args, **kwds) -> None:
 		"""
-		In the call function because they can be parametrized
+		TODO: Parameterization
 		"""
 
-		self.normalization()
-		self._document_root: Block = self.hierarchization()
-		
-		self.print(document_root=self._document_root)
+		self._effective_structure: EffectiveStructureFromOoxml = EffectiveStructureFromOoxml.normalization(
+			ooxml_docx=self.ooxml_docx
+		)
+		self._hierarchical_structure: HierarchicalStructureFromOoxml = HierarchicalStructureFromOoxml.hierarchization(
+			effective_structure_from_ooxml=self.effective_structure
+		)
+		self._views: AbstractDocxViews = AbstractDocxViews.load(
+			effective_structure=self.effective_structure, hierarchical_structure=self.hierarchical_structure
+		)		
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
 		
@@ -147,7 +133,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 	def to_txt(self) -> None:
 		s: str = ""
-		for root in self.document_root.children:
+		for root in self.views.document.root.children:
 			s += self._to_text(block=root)
 		
 		with open(f"{self.file_path}.txt", "w+", encoding="utf-8") as f:
@@ -173,7 +159,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 	def to_json(self) -> None:
 		root_data: dict = {"id": -1, "text": "__ROOT__", "children": []}
-		for child in self.document_root.children:
+		for child in self.views.document.root.children:
 			root_data["children"].append(self._to_json(block=child))
 
 		json_data = json.dumps(root_data, indent=4)

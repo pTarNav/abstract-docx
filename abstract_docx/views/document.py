@@ -51,21 +51,34 @@ class Paragraph(Block):
 	def __str__(self):
 		return "".join([content.text for content in self.content])
 
+
 class CellMergeRange(ArbitraryBaseModel):
 	start_row_loc: int
 	start_column_loc: int
 	row_span: int
 	column_span: int
 
+
 class Cell(ArbitraryBaseModel):
 	loc: int
 	blocks: list[Block]
+
 
 class Row(ArbitraryBaseModel):
 	loc: int
 	cells: list[Cell]
 
+
 class Table(Block):
 	rows: list[Row]
 	cell_merge_ranges: Optional[list[CellMergeRange]] = None
 	caption: Optional[Paragraph] = None
+
+
+class DocumentView(ArbitraryBaseModel):
+	blocks: dict[int, Block]
+	root: Block
+
+	@classmethod
+	def load(cls, blocks: dict[int, Block], root: Block) -> DocumentView:
+		return cls(	blocks=blocks, root=root)

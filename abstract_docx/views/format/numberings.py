@@ -422,8 +422,6 @@ class Enumeration(ArbitraryBaseModel):
 	def detect(self, text: "Text") -> dict[str, list[Level]]:  # Type hint as string to avoid circular import hell
 		matches: dict[str, list[Level]] = {
 			"regex_and_style": [],
-			"regex_and_run_style_properties": [],
-			"regex_and_paragraph_style_properties": [],
 			"regex_only": []
 		}
 		
@@ -432,15 +430,12 @@ class Enumeration(ArbitraryBaseModel):
 			if detection_regexes[level_id] is not None:		
 				match = re.match(self.detection_regexes[level_id], text.text)
 				if match is not None:
-					if level.style == text.style:
+					# Only take run style properties into account,
+					#  since using paragraph style properties too can lead to false negatives
+					if level.style.properties.run_style_properties == text.style.properties.run_style_properties:
 						matches["regex_and_style"].append(level)
 					else:
-						if level.style.properties.run_style_properties == text.style.properties.run_style_properties:
-							matches["regex_and_run_style_properties"].append(level)
-						elif level.style.properties.paragraph_style_properties == text.style.properties.paragraph_style_properties:
-							matches["regex_and_paragraph_style_properties"].append(level)
-						else:
-							matches["regex_only"].append(level)
+						matches["regex_only"].append(level)
 		
 		return matches
 	
@@ -455,3 +450,23 @@ class Index(ArbitraryBaseModel):
 	numbering: Numbering
 	enumeration: Enumeration
 	level: Level
+
+
+class NumberingsView(ArbitraryBaseModel):
+	numberings: dict[int, Numbering]
+	enumerations: dict[str, Enumeration]
+	levels: dict[str, Level]
+
+	@classmethod
+	def load(
+		cls, 
+		numberings: dict[int, Numbering],
+		enumerations: dict[str, Enumeration],
+		levels: dict[str, Level]
+	) -> NumberingsView:
+		return cls(numberings=numberings, enumerations=enumerations, levels=levels)
+
+	
+	def priority_difference(self, curr_index: Index, prev_index: Index) -> int:
+		pass
+		#return self._find_priority(style=curr_style) - self._find_priority(style=prev_style)
