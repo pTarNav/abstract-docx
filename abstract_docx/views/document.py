@@ -81,4 +81,4 @@ class DocumentView(ArbitraryBaseModel):
 
 	@classmethod
 	def load(cls, blocks: dict[int, Block], root: Block) -> DocumentView:
-		return cls(	blocks=blocks, root=root)
+		return cls(blocks=blocks, root=root)

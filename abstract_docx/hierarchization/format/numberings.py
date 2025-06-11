@@ -45,6 +45,8 @@ class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
 			styles_view=styles_view
 		)
 		hierarchical_numberings_from_ooxml.compute()
+
+		return hierarchical_numberings_from_ooxml
 	
 	def compute_priority_difference(self, level: Level, level_priority_representative: Level) -> int:
 		"""

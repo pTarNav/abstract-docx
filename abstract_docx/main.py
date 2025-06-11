@@ -109,10 +109,10 @@ class AbstractDocx(ArbitraryBaseModel):
 			for child in curr_block.children:
 				self._print_document(curr_block=child, prev_tree_node=curr_tree_node, depth=depth+1, include_metadata=include_metadata)
 
-	def print(self, document_root: Block, include_metadata: bool = False) -> None:
+	def print(self, include_metadata: bool = False) -> None:
 		tree_root: Tree = Tree("Document")
 
-		self._print_document(curr_block=document_root, prev_tree_node=tree_root, include_metadata=include_metadata)
+		self._print_document(curr_block=self.views.document.root, prev_tree_node=tree_root, include_metadata=include_metadata)
 		print(rich_tree_to_str(tree_root))
 	
 	def _to_text(self, block: Block, depth: int=0) -> str:
@@ -170,6 +170,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[1]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[0]}.docx")
 	x()
-	x.to_json()
+	x.print()

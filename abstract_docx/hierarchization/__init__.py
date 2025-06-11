@@ -25,7 +25,9 @@ class HierarchicalStructureFromOoxml(ArbitraryBaseModel):
 		)
 		
 		hierarchical_document_from_ooxml: HierarchicalDocumentFromOoxml = HierarchicalDocumentFromOoxml.hierarchization(
-			effective_structure_from_ooxml=effective_structure_from_ooxml
+			effective_structure_from_ooxml=effective_structure_from_ooxml,
+			hierarchical_styles_from_ooxml=hierarchical_styles_from_ooxml,
+			hierarchical_numberings_from_ooxml=hierarchical_numberings_from_ooxml
 		)
 
 		return cls(

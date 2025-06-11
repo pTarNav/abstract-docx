@@ -457,16 +457,69 @@ class NumberingsView(ArbitraryBaseModel):
 	enumerations: dict[str, Enumeration]
 	levels: dict[str, Level]
 
+	priority_keys: dict[int, list[str]]
+
 	@classmethod
 	def load(
 		cls, 
 		numberings: dict[int, Numbering],
 		enumerations: dict[str, Enumeration],
-		levels: dict[str, Level]
+		levels: dict[str, Level],
+		priority_ordered_levels: list[list[Level]]
 	) -> NumberingsView:
-		return cls(numberings=numberings, enumerations=enumerations, levels=levels)
+		return cls(
+			numberings=numberings,
+			enumerations=enumerations,
+			levels=levels,
+			priority_keys={
+				priority: [level.id for level in levels_in_priority]
+				for priority, levels_in_priority in enumerate(priority_ordered_levels)
+			}
+		)
 
+	@property
+	def priorities(self) -> dict[int, list[Level]]:
+		return {
+			priority: [self.levels[level_id] for level_id in levels_keys]
+			for priority, levels_keys in self.priority_keys.items()
+		}
 	
-	def priority_difference(self, curr_index: Index, prev_index: Index) -> int:
-		pass
-		#return self._find_priority(style=curr_style) - self._find_priority(style=prev_style)
+	def _find_priority(self, level: Level) -> int:
+		# TODO make it cleaner
+		for priority, level_ids_in_priority in self.priority_keys.items():
+			if level.id in level_ids_in_priority:
+				return priority
+		
+		raise KeyError("") # TODO
+
+	def priority_difference(self, curr_index: Optional[Index], prev_index: Optional[Index]) -> int:
+		if curr_index is None or prev_index is None or curr_index.numbering.id != prev_index.numbering.id:
+			return 0
+		
+		if curr_index.enumeration.id == prev_index.enumeration.id:
+			if curr_index.level.id == prev_index.level.id:
+				return 0
+			
+			curr_level_key: int = -1
+			prev_level_key: int = -1
+			for level_key, level in curr_index.enumeration.levels.items():
+				if curr_index.level.id == level.id:
+					curr_level_key = level_key
+				if prev_index.level.id == level.id:
+					prev_level_key = level_key
+				
+				if curr_level_key != -1 and prev_level_key != -1:
+					if curr_level_key < prev_level_key:
+						return 1
+					elif curr_level_key > prev_level_key:
+						return -1
+			
+			raise ValueError("")
+		
+		match self._find_priority(level=curr_index.level) - self._find_priority(level=prev_index.level):
+			case 0:
+				return 0
+			case diff_priority if diff_priority < 0:
+				return 1
+			case diff_priority if diff_priority > 0:
+				return -1
