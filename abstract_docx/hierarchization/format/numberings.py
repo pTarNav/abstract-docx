@@ -9,7 +9,7 @@ from abstract_docx.normalization import EffectiveStructureFromOoxml
 
 
 class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
-	priority_ordered_levels: list[list[Level]]
+	priority_ordered_enumeration_and_levels: dict[str, list[list[Level]]]
 	effective_structure_from_ooxml: EffectiveStructureFromOoxml
 
 	@classmethod
@@ -18,7 +18,7 @@ class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
 	) -> HierarchicalNumberingsFromOoxml:
 		
 		hierarchical_numberings_from_ooxml: HierarchicalNumberingsFromOoxml = cls(
-			priority_ordered_levels=[],
+			priority_ordered_enumerations_and_levels={},
 			effective_structure_from_ooxml=effective_structure_from_ooxml
 		)
 		hierarchical_numberings_from_ooxml.compute()

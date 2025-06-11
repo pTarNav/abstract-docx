@@ -465,11 +465,31 @@ class StylesView(ArbitraryBaseModel):
 		return cls(
 			styles=styles,
 			priority_keys={
-				priority_level: [style.id for style in styles_in_priority_level]
-				for priority_level, styles_in_priority_level in enumerate(priority_ordered_styles)
+				priority: [style.id for style in styles_in_priority]
+				for priority, styles_in_priority in enumerate(priority_ordered_styles)
 			}
 		)
 
 	@property
 	def priorities(self) -> dict[int, list[Style]]:
-		return {level: [self.styles[name] for name in styles_keys] for level, styles_keys in self.priority_keys.items()}
+		return {
+			priority: [self.styles[style_id] for style_id in styles_keys]
+			for priority, styles_keys in self.priority_keys.items()
+		}
+	
+	def _find_priority(self, style: Style) -> int:
+		# TODO make it cleaner
+		for priority, style_ids_in_priority in self.priority_keys.items():
+			if style.id in style_ids_in_priority:
+				return priority
+		
+		raise KeyError("") # TODO
+	
+	def priority_difference(self, curr_style: Style, prev_style: Style) -> int:
+		match self._find_priority(style=curr_style) - self._find_priority(style=prev_style):
+			case 0:
+				return 0
+			case diff_priority if diff_priority > 0:
+				return 1
+			case diff_priority if diff_priority < 0:
+				return -1

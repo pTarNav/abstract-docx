@@ -457,26 +457,16 @@ class NumberingsView(ArbitraryBaseModel):
 	enumerations: dict[str, Enumeration]
 	levels: dict[str, Level]
 
-	priority_keys: dict[int, list[str]]
-
 	@classmethod
 	def load(
 		cls, 
 		numberings: dict[int, Numbering],
 		enumerations: dict[str, Enumeration],
-		levels: dict[str, Level],
-		priority_ordered_levels: list[list[Level]]
+		levels: dict[str, Level]
 	) -> NumberingsView:
-		return cls(
-			numberings=numberings,
-			enumerations=enumerations,
-			levels=levels,
-			priority_keys={
-				priority_level: [style.id for style in levels_in_priority_level]
-				for priority_level, levels_in_priority_level in enumerate(priority_ordered_levels)
-			}
-		)
+		return cls(numberings=numberings, enumerations=enumerations, levels=levels)
 
-	@property
-	def priorities(self) -> dict[int, list[Level]]:
-		return {level: [self.levels[name] for name in levels_keys] for level, levels_keys in self.priority_keys.items()}
+	
+	def priority_difference(self, curr_index: Index, prev_index: Index) -> int:
+		pass
+		#return self._find_priority(style=curr_style) - self._find_priority(style=prev_style)
