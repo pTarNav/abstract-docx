@@ -20,7 +20,8 @@ class HierarchicalStructureFromOoxml(ArbitraryBaseModel):
 		)
 
 		hierarchical_numberings_from_ooxml: HierarchicalNumberingsFromOoxml = HierarchicalNumberingsFromOoxml.hierarchization(
-			effective_structure_from_ooxml=effective_structure_from_ooxml
+			effective_structure_from_ooxml=effective_structure_from_ooxml,
+			hierarchical_styles_from_ooxml=hierarchical_styles_from_ooxml
 		)
 		
 		hierarchical_document_from_ooxml: HierarchicalDocumentFromOoxml = HierarchicalDocumentFromOoxml.hierarchization(

@@ -489,7 +489,7 @@ class StylesView(ArbitraryBaseModel):
 		match self._find_priority(style=curr_style) - self._find_priority(style=prev_style):
 			case 0:
 				return 0
-			case diff_priority if diff_priority > 0:
-				return 1
 			case diff_priority if diff_priority < 0:
+				return 1
+			case diff_priority if diff_priority > 0:
 				return -1

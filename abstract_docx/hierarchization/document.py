@@ -152,7 +152,7 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 
 from enum import Enum
 from abstract_docx.normalization.document import EffectiveDocumentFromOoxml
-from abstract_docx.views.format import FormatsView
+from abstract_docx.views.format import FormatView
 from abstract_docx.views.document import Paragraph, Block
 from abstract_docx.views.format.styles import Style
 
@@ -162,7 +162,7 @@ class HierarchizationConflictResolutionParameter(Enum):
 
 hierarchization_conflict_resolution = HierarchizationConflictResolutionParameter.UNBOUNDED
 
-def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_levels: dict[int, int], _computed_numbering_level_indexes: dict[int, dict[int, int]], formats_view: FormatsView):
+def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_levels: dict[int, int], _computed_numbering_level_indexes: dict[int, dict[int, int]], formats_view: FormatView):
 	end_of_recursion: bool = True
 
 	# A higher priority level actually indicates lower hierarchy
@@ -273,7 +273,7 @@ def traverse(curr_block: Block, prev_block: Block, _computed_style_priority_leve
 		displayed_level_indexes = {k: v for k, v in _computed_numbering_level_indexes[curr_block.format.index.numbering.id].items() if v is not None and k <= indentation_level}
 		curr_block.level_indexes = displayed_level_indexes
 
-def document_hierarchization(effective_document: EffectiveDocumentFromOoxml, formats_view: FormatsView) -> Block:
+def document_hierarchization(effective_document: EffectiveDocumentFromOoxml, formats_view: FormatView) -> Block:
 	
 	styles_view_priorities: dict[int, list[Style]] = formats_view.styles.priorities.items()
 

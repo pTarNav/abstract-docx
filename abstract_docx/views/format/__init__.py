@@ -6,9 +6,8 @@ from utils.pydantic import ArbitraryBaseModel
 from abstract_docx.views.format.styles import StylesView, Style
 from abstract_docx.views.format.numberings import NumberingsView, Index
 
-from abstract_docx.normalization import EffectiveStructureFromOoxml
-from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
-
+# from abstract_docx.normalization import EffectiveStructureFromOoxml
+# from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
 
 class Format(ArbitraryBaseModel):
 	style: Style
@@ -22,8 +21,8 @@ class FormatView(ArbitraryBaseModel):
 	@classmethod
 	def load(
 		cls,
-		effective_structure: EffectiveStructureFromOoxml,
-		hierarchical_structure: HierarchicalStructureFromOoxml
+		effective_structure: "EffectiveStructureFromOoxml",
+		hierarchical_structure: "HierarchicalStructureFromOoxml"
 	) -> FormatView:
 		return cls(
 			styles=StylesView.load(

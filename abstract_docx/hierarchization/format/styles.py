@@ -119,25 +119,26 @@ class HierarchicalStylesFromOoxml(ArbitraryBaseModel):
 		return 0
 	
 	def compute(self) -> None:
-		self.priority_ordered_styles.append(self.effective_structure_from_ooxml.styles.effective_styles.values()[0])
+		for effective_style in self.effective_structure_from_ooxml.styles.effective_styles.values():
+			if len(self.priority_ordered_styles) == 0:
+				self.priority_ordered_styles.append([effective_style])
+			else:
+				for i, priority in enumerate(self.priority_ordered_styles):
+					priority_difference: int = self.compute_priority_difference(
+						style=effective_style, style_priority_representative=priority[0]
+					)
 
-		for effective_style in self.effective_structure_from_ooxml.styles.effective_styles.values()[1:]:
-			for i, priority in enumerate(self.priority_ordered_styles):
-				priority_difference: int = self.compute_priority_difference(
-					style=effective_style, style_priority_representative=priority[0]
-				)
-
-				match priority_difference:
-					case -1:
-						# Continue searching for equal or lower priority (if possible)
-						if i == len(self.priority_ordered_styles) - 1:
-							self.priority_ordered_styles.append([effective_style])
-					case 0:
-						# Insert style into the current priority level (and stop search)
-						priority.append(effective_style)
-						break
-					case 1:
-						# Insert style one priority level above of the current priority level (and stop search)
-						priority.insert(i, [effective_style])
-						break
+					match priority_difference:
+						case -1:
+							# Continue searching for equal or lower priority (if possible)
+							if i == len(self.priority_ordered_styles) - 1:
+								self.priority_ordered_styles.append([effective_style])
+						case 0:
+							# Insert style into the current priority level (and stop search)
+							priority.append(effective_style)
+							break
+						case 1:
+							# Insert style one priority level above of the current priority level (and stop search)
+							self.priority_ordered_styles.insert(i, [effective_style])
+							break
 	
