@@ -52,7 +52,6 @@ class HierarchicalStylesFromOoxml(ArbitraryBaseModel):
 	priority_ordered_styles: list[list[Style]]
 
 	effective_structure_from_ooxml: EffectiveStructureFromOoxml
-	_
 	styles_priority_parameters: StylesPriorityParameters
 
 	@classmethod
