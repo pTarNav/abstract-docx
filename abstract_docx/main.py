@@ -170,6 +170,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[0]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[1]}.docx")
 	x()
 	x.print()

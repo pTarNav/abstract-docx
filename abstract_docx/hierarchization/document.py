@@ -4,7 +4,7 @@ from enum import Enum
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.styles import StylesView
+from abstract_docx.views.format.styles import StylesView, Style, StyleProperties
 from abstract_docx.views.format.numberings import NumberingsView
 from abstract_docx.views.document import Block, Paragraph
 
@@ -78,22 +78,31 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 		return hierarchical_document_from_ooxml
 	
 	def _traverse(self, curr_block: Block, prev_block: Block) -> None:
-		print(curr_block.id, prev_block.id)
 		end_of_recursion: bool = True
+
+		# TODO: implicit_index_matches
 
 		total_priority_difference: int = -1
 		if prev_block.id != -1:
-			styles_priority_difference: int = self.styles_view.priority_difference(
-				curr_style=curr_block.format.style, prev_style=prev_block.format.style
-			)
-			numberings_priority_difference: int = self.numberings_view.priority_difference(
-				curr_index=curr_block.format.index, prev_index=prev_block.format.index
-			)
-			shared_numbering: bool = (
+			indexes_present: bool = (
 				not prev_block.id == -1
 				and curr_block.format.index is not None 
 				and prev_block.format.index is not None 
-				and curr_block.format.index.numbering == prev_block.format.index.numbering
+			)
+			shared_numbering: bool = (
+				indexes_present and curr_block.format.index.numbering == prev_block.format.index.numbering
+			)
+
+			styles_priority_difference: int = self.styles_view.priority_difference(
+				curr_style=curr_block.format.style, prev_style=prev_block.format.style
+			)
+			if indexes_present and styles_priority_difference == 0:
+				styles_priority_difference = self.styles_view.priority_difference(
+					curr_style=curr_block.format.index.level.style, prev_style=prev_block.format.index.level.style
+				)
+			
+			numberings_priority_difference: int = self.numberings_view.priority_difference(
+				curr_index=curr_block.format.index, prev_index=prev_block.format.index
 			)
 
 			if shared_numbering:

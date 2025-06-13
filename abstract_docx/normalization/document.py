@@ -1,5 +1,9 @@
 from __future__ import annotations
 from typing import Optional
+
+import re
+		
+
 import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
 
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
@@ -366,7 +370,24 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# TODO
 		raise ValueError()
 
-	def _associate_effective_block_numberings(self) -> None:
+	def _remove_detected_index_from_effective_paragraph(self, effective_paragraph: Paragraph, detected_index: Index) -> None:
+
+		detected_level_key: int = next(level_key for level_key, level in detected_index.enumeration.levels.items() if detected_index.level.id == level.id)
+		print(detected_index.enumeration.detection_regexes[detected_level_key])
+
+		seen_runs: list[Text] = []
+		for i, run in enumerate(effective_paragraph.content):
+			seen_runs.append(run)
+			partial_text: Text = Text(text="".join([t.text for t in seen_runs]), style=seen_runs[0].style)
+
+			if re.match(detected_index.enumeration.detection_regexes[detected_level_key], partial_text.text):
+				partial_text.text = re.sub(
+					detected_index.enumeration.detection_regexes[detected_level_key], "", partial_text.text
+				)
+				effective_paragraph.content = [partial_text] + effective_paragraph.content[i+1:]
+				break
+
+	def _associate_effective_block_index(self) -> None:
 
 		for effective_block in self.effective_document.values():
 			# TODO: Add typehint for ooxml table
@@ -394,12 +415,12 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					if detected_index_matches is not None:
 						if isinstance(detected_index_matches, Index):
 							effective_block.format.index = detected_index_matches
+							self._remove_detected_index_from_effective_paragraph(effective_paragraph=effective_block, detected_index=detected_index_matches)							
 						else:
 							self.implicit_index_matches[effective_block.id] = detected_index_matches
-					
 					
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		self._associate_effective_block_styles()
-		self._associate_effective_block_numberings()
+		self._associate_effective_block_index()
 	

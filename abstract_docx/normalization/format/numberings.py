@@ -11,6 +11,8 @@ from abstract_docx.views.format.styles import Style, StyleProperties
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 
 
+# ! It is not inheriting any linkStyle style properties
+
 class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	"""
 	Auxiliary effective numbering class, not designed to structure data (same structure as Numbering),
@@ -45,6 +47,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			ooxml_abstract_numbering.id: Numbering(id=ooxml_abstract_numbering.id, enumerations={})
 			for ooxml_abstract_numbering in ooxml_abstract_numberings
 		}
+		# ! TODO: make sure that all of them end up being used, if not discard the ones where they still remain empty
 
 	@classmethod
 	def normalization(
@@ -84,10 +87,15 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				),
 				style=Style(
 					id=add_level.style.id if add_level is not None else agg_level.style.id,
-					properties=StyleProperties.aggregate_ooxml(
-						agg=agg_level.style.properties if agg_level is not None else effective_default_style.properties,
-						add=add_level.style.properties if add_level is not None else effective_default_style.properties,
-						default=effective_default_style.properties
+					properties=
+					(
+						StyleProperties.aggregate_ooxml(
+							agg=agg_level.style.properties if agg_level is not None else effective_default_style.properties,
+							add=add_level.style.properties,
+							default=effective_default_style.properties
+						) if add_level is not None else (
+							agg_level.style.properties if agg_level is not None else effective_default_style.properties
+						)
 					)
 				)
 			)
@@ -264,7 +272,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					for k, v in ooxml_numbering.overrides.items()
 				}
 			)
-
 			# Aggregate: agg_effective_abstract_enumeration + effective_enumeration => agg_effective_enumeration
 			agg_effective_enumeration: Enumeration = self.aggregate_effective_enumerations(
 				agg_enumeration=agg_effective_abstract_enumeration,
@@ -329,7 +336,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def load(self) -> None:
 		"""
 		"""
-		self._compute_effective_enumerations()
+		self._compute_effective_enumerations()		
 		self._associate_effective_level_styles()
 		print(len(self.effective_numberings))
 		print(len(self.effective_enumerations))
