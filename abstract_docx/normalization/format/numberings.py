@@ -338,9 +338,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		"""
 		self._compute_effective_enumerations()		
 		self._associate_effective_level_styles()
-		print(len(self.effective_numberings))
-		print(len(self.effective_enumerations))
-		print(len(self.effective_levels))
 
 	def _deduplicate_levels(self) -> None:
 		groups: dict[str, Level] = {}
@@ -425,10 +422,6 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		
 		self._deduplicate_enumerations()
 		self._associate_deduplicated_enumerations()
-
-		print(len(self.effective_numberings))
-		print(len(self.effective_enumerations))
-		print(len(self.effective_levels))
 	
 	def get_mapped_enumeration_id(self, ooxml_numbering_id: int) -> str:
 		return self.map_ooxml_to_effective_deduplicated_enumerations.get(str(ooxml_numbering_id))

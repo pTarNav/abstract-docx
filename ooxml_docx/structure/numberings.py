@@ -444,9 +444,7 @@ class Numbering(OoxmlElement):
 		for i, level in self.abstract_numbering.levels.items():
 			if level.style is not None and level.style.id == style.id:
 				return i
-		if self.abstract_numbering.associated_styles is not None and self.abstract_numbering.associated_styles.style_parent is not None:
-			print(self.abstract_numbering.id)
-			print(self.abstract_numbering.associated_styles.style_parent)
+		
 		if (
 			self.abstract_numbering.associated_styles is not None 
 			and self.abstract_numbering.associated_styles.style_parent is not None

@@ -6,8 +6,9 @@ from utils.printing import rich_tree_to_str
 
 from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.relationships import OoxmlRelationships
-from ooxml_docx.structure.properties import TableProperties, TableRowProperties, TableCellProperties
+from ooxml_docx.structure.properties import TableProperties, TableRowProperties, TableCellProperties, NumberingProperties
 from ooxml_docx.structure.styles import TableStyle, OoxmlStyles, OoxmlStyleTypes
+from ooxml_docx.structure.numberings import NumberingStyle, Numbering, OoxmlNumberings
 from ooxml_docx.document.paragraph import Paragraph
 
 
@@ -22,6 +23,7 @@ class TableCell(OoxmlElement):
 		cls, 
 		ooxml_cell: OoxmlElement, 
 		styles: OoxmlStyles, 
+		numberings: OoxmlNumberings,
 		relationships: OoxmlRelationships, 
 		loc: Optional[tuple[int, int]] = None
 	) -> TableCell:
@@ -34,14 +36,16 @@ class TableCell(OoxmlElement):
 
 		return cls(
 			element=ooxml_cell.element,
-			content=cls._parse_content(ooxml_cell=ooxml_cell, styles=styles, relationships=relationships),
+			content=cls._parse_content(
+				ooxml_cell=ooxml_cell, styles=styles, numberings=numberings, relationships=relationships
+			),
 			properties=TableCellProperties(ooxml=properties) if properties is not None else None,
 			loc=loc
 		)
 	
 	@staticmethod
 	def _parse_content(
-		ooxml_cell: OoxmlElement, styles: OoxmlStyles,relationships: OoxmlRelationships
+		ooxml_cell: OoxmlElement, styles: OoxmlStyles, numberings: OoxmlNumberings, relationships: OoxmlRelationships
 	) -> list[Paragraph | Table]:
 		"""_summary_
 
@@ -56,13 +60,12 @@ class TableCell(OoxmlElement):
 		for ooxml_element in ooxml_content:
 			match ooxml_element.local_name:
 				case "p":
-					continue
 					element: Paragraph = Paragraph.parse(
-						ooxml_paragraph=ooxml_element, styles=styles, relationships=relationships
+						ooxml_paragraph=ooxml_element, styles=styles, numberings=numberings, relationships=relationships
 					)
 				case "tbl":
 					element: Table = Table.parse(
-						ooxml_table=ooxml_element, styles=styles, relationships=relationships
+						ooxml_table=ooxml_element, styles=styles, numberings=numberings, relationships=relationships
 					)
 				case _:
 					raise ValueError("")  # TODO
@@ -86,7 +89,12 @@ class TableRow(OoxmlElement):
 
 	@classmethod
 	def parse(
-		cls, ooxml_row: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships, loc: Optional[int] = None
+		cls,
+		ooxml_row: OoxmlElement,
+		styles: OoxmlStyles,
+		numberings: OoxmlNumberings,
+		relationships: OoxmlRelationships,
+		loc: Optional[int] = None
 	) -> TableRow:
 		"""_summary_
 
@@ -97,14 +105,20 @@ class TableRow(OoxmlElement):
 		
 		return cls(
 			element=ooxml_row.element,
-			cells=cls._parse_cells(ooxml_row=ooxml_row, styles=styles, relationships=relationships, loc=loc),
+			cells=cls._parse_cells(
+				ooxml_row=ooxml_row, styles=styles, numberings=numberings, relationships=relationships, loc=loc
+			),
 			properties=TableRowProperties(ooxml=properties) if properties is not None else None,
 			loc=loc
 		)
 	
 	@staticmethod
 	def _parse_cells(
-		ooxml_row: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships, loc: int
+		ooxml_row: OoxmlElement,
+		styles: OoxmlStyles,
+		numberings: OoxmlNumberings,
+		relationships: OoxmlRelationships,
+		loc: int
 	) -> list[TableCell]:
 		"""_summary_
 
@@ -117,7 +131,9 @@ class TableRow(OoxmlElement):
 		
 		cells: list[TableCell] = []
 		for i, ooxml_cell in enumerate(ooxml_cells):
-			cells.append(TableCell.parse(ooxml_cell=ooxml_cell, styles=styles, relationships=relationships, loc=(loc, i)))
+			cells.append(TableCell.parse(
+				ooxml_cell=ooxml_cell, styles=styles, numberings=numberings, relationships=relationships, loc=(loc, i)
+			))
 		
 		return cells
 
@@ -137,25 +153,45 @@ class Table(OoxmlElement):
 
 	caption: Optional[str] = None
 
+	numbering: Optional[Numbering] = None
+	indentation_level: Optional[int] = None
+
 	@classmethod
-	def parse(cls, ooxml_table: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> Table:
+	def parse(
+		cls, 
+		ooxml_table: OoxmlElement, 
+		styles: OoxmlStyles,
+		numberings: OoxmlNumberings, 
+		relationships: OoxmlRelationships
+	) -> Table:
 		"""_summary_
 
 		:param ooxml_table: _description_
 		:return: _description_
 		"""
 		properties: Optional[OoxmlElement] = ooxml_table.xpath_query(query="./w:tblPr", singleton=True)
+		style: Optional[TableStyle] = cls._parse_style(ooxml_table=ooxml_table, styles=styles)
+
+		numbering_parse_result: Optional[tuple[Numbering, int]] = cls._parse_numbering(
+			ooxml_table=ooxml_table,
+			style=style,  
+			numberings=numberings
+		)
 		
 		return cls(
 			element=ooxml_table.element,
-			rows=cls._parse_rows(ooxml_table=ooxml_table, styles=styles, relationships=relationships),
+			rows=cls._parse_rows(ooxml_table=ooxml_table, styles=styles, numberings=numberings, relationships=relationships),
 			properties=TableProperties(ooxml=properties) if properties is not None else None,
 			style=cls._parse_style(ooxml_table=ooxml_table, styles=styles),
-			caption=None
+			caption=None, # TODO
+			numbering=numbering_parse_result[0] if numbering_parse_result is not None else None,
+			indentation_level=numbering_parse_result[1] if numbering_parse_result is not None else None
 		)
 	
 	@staticmethod
-	def _parse_rows(ooxml_table: OoxmlElement, styles: OoxmlStyles, relationships: OoxmlRelationships) -> list[TableRow]:
+	def _parse_rows(
+		ooxml_table: OoxmlElement, styles: OoxmlStyles, numberings: OoxmlNumberings, relationships: OoxmlRelationships
+	) -> list[TableRow]:
 		"""_summary_
 
 		:param ooxml_table: _description_
@@ -167,7 +203,9 @@ class Table(OoxmlElement):
 		
 		rows: list[TableRow] = []
 		for i, ooxml_row in enumerate(ooxml_rows):
-			rows.append(TableRow.parse(ooxml_row=ooxml_row, styles=styles, relationships=relationships, loc=i))
+			rows.append(TableRow.parse(
+				ooxml_row=ooxml_row, styles=styles, numberings=numberings, relationships=relationships, loc=i
+			))
 		
 		return rows
 	
@@ -190,10 +228,20 @@ class Table(OoxmlElement):
 			return table_style_search_result
 
 		raise ValueError(f"Undefined style reference for style id: {style_id}")
+	
+	@staticmethod
+	def _parse_numbering(
+			ooxml_table: OoxmlElement, style: Optional[TableStyle], numberings: OoxmlNumberings
+		) -> Optional[tuple[Numbering, int]]:
+
+		# ! TODO: more complicated than i thought
+
+		return None
 
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
 	
 	def _tree_str_(self) -> Tree:
+		# TODO
 		tree = Tree("table")
 		return tree

@@ -73,7 +73,9 @@ class OoxmlDocument(OoxmlElement):
 						ooxml_paragraph=ooxml_element, styles=styles, numberings=numberings, relationships=relationships
 					)
 				case "tbl":
-					element: Table = Table.parse(ooxml_table=ooxml_element, styles=styles, relationships=relationships)
+					element: Table = Table.parse(
+						ooxml_table=ooxml_element, styles=styles, numberings=numberings, relationships=relationships
+					)
 				case _:
 					# ! TODO: Remove continue
 					continue
