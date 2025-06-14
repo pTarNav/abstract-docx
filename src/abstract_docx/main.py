@@ -154,12 +154,13 @@ class AbstractDocx(ArbitraryBaseModel):
 		
 		return s
 
-	def to_txt(self) -> None:
+	def to_txt(self, output_file_path: Optional[str]=None) -> None:
 		s: str = ""
 		for root in self.views.document.root.children:
 			s += self._to_text(block=root)
 		
-		with open(f"{self.file_path}.txt", "w+", encoding="utf-8") as f:
+		output_file_path: str = f"{self.file_path}.txt" if output_file_path is not None else output_file_path
+		with open(output_file_path, "w+", encoding="utf-8") as f:
 			f.write(s)
 
 	def _to_json(self, block: Block) -> dict:
@@ -193,6 +194,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[2]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[3]}.docx")
 	x()
 	x.print()
