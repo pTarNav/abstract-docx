@@ -60,9 +60,11 @@ class CellMergeRange(ArbitraryBaseModel):
 
 
 class Cell(ArbitraryBaseModel):
-	loc: int
+	loc: tuple[int, int]
 	blocks: list[Block]
 
+	def __str__(self):
+		return "".join([str(block) for block in self.blocks])  # TODO: it will fail for nested tables but cannot be bothered for now
 
 class Row(ArbitraryBaseModel):
 	loc: int

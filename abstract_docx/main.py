@@ -10,10 +10,12 @@ from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
 
 from abstract_docx.views import AbstractDocxViews
-from abstract_docx.views.document import Block, Paragraph
+from abstract_docx.views.document import Block, Paragraph, Table
 
 from rich.tree import Tree
+from rich.table import Table as RichTable
 from rich.text import Text as RichText
+from rich.console import Group as RichGroup
 import colorsys
 from utils.printing import rich_tree_to_str
 
@@ -86,11 +88,33 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		if isinstance(curr_block, Paragraph):
 			rich_text: RichText = (
-				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
+				RichText(f"[{curr_block.id}] ", style=node_style(d=depth)) 
 				+ RichText(f"{curr_block_numbering_str} ", style="gray70")
 				+ RichText(str(curr_block), style="white")
 			)
 			curr_tree_node = prev_tree_node.add(rich_text)
+
+			if include_metadata:
+				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
+				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
+		elif isinstance(curr_block, Table):
+			rich_table: RichTable = RichTable(show_header=False, show_lines=True)
+			for _ in range(len(curr_block.rows[0].cells)):
+				rich_table.add_column()
+
+			for row in curr_block.rows:
+				print([str(cell_content) for cell_content in row.cells])
+				rich_table.add_row(*[RichText(str(cell_content), style="white") for cell_content in row.cells])
+
+			rich_text_group: RichGroup = RichGroup(
+				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)),
+				RichText(f"{curr_block_numbering_str} ", style="gray70"),
+				rich_table
+			)
+			curr_tree_node = prev_tree_node.add(rich_text_group)
 
 			if include_metadata:
 				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
@@ -170,6 +194,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[1]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[0]}.docx")
 	x()
 	x.print()

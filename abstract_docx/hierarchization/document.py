@@ -200,9 +200,7 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 
 		prev_block: Block = self.root
 		for block in self.effective_structure_from_ooxml.document.effective_document.values():
-			if isinstance(block, Paragraph): # TODO: why specify for paras only?
-				self._traverse(curr_block=block, prev_block=prev_block)
-		
+			self._traverse(curr_block=block, prev_block=prev_block)
 			prev_block: Block = block
 
 

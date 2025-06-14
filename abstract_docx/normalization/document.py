@@ -5,12 +5,13 @@ import re
 		
 
 import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
+import ooxml_docx.document.table as OOXML_TABLE
 
 from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
 
 from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
-from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink
+from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink, Table, Row, Cell
 
 import ooxml_docx.document.run as OOXML_RUN
 from abstract_docx.views.format import Format
@@ -109,8 +110,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		
 		return effective_texts
 
-	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> None:
-
+	def compute_effective_paragraph(self, ooxml_paragraph: OOXML_PARAGRAPH.Paragraph, block_id: int) -> Paragraph:
 		if ooxml_paragraph.properties is not None:
 			effective_paragraph_style: Style = Style(
 				id=f"__@PARAGRAPH={block_id}__",
@@ -121,7 +121,8 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					),
 					add=(
 						StyleProperties.from_ooxml(
-							run_properties=ooxml_paragraph.properties.run_properties, paragraph_properties=ooxml_paragraph.properties
+							run_properties=ooxml_paragraph.properties.run_properties,
+							paragraph_properties=ooxml_paragraph.properties
 						)
 					),
 					default=self.effective_styles_from_ooxml.get_default().properties
@@ -179,16 +180,75 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		#  		- Whitespace detected only at the beginning: The whitespace is pulled into the first indentation.
 		#  		- Whitespace detected repeatedly for each line: The whitespace is pulled into the start indentation.
 		
-		effective_paragraph: Paragraph = Paragraph(
+		return Paragraph(
 			id=block_id,
 			content=effective_paragraph_content,
 			format=Format(style=effective_paragraph_style)
 		)
-		# print()
-		# print(effective_paragraph)
-		# print("possible numbering and level matches", possible_numbering_and_level_matches)
 
-		self.effective_document[block_id] = effective_paragraph
+	def _compute_effective_cells(
+			self, ooxml_cells: list[OOXML_TABLE.TableCell], effective_row_style: Style, block_id: int
+		) -> list[Cell]:
+		
+		# ! TODO: take into account styles
+
+		effective_cells: list[Cell] = []
+
+		for ooxml_cell in ooxml_cells:
+			effective_cell_content: list[Block] = []
+			for ooxml_block in ooxml_cell.content:
+				match type(ooxml_block):
+					case OOXML_PARAGRAPH.Paragraph:
+						effective_cell_content.append(self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id))
+					case OOXML_TABLE.Table:
+						effective_cell_content.append(self.compute_effective_table(ooxml_table=ooxml_block, block_id=block_id))
+					case _:
+						# ! TODO: Remove continue
+						continue
+						raise ValueError(f"Unexpected ooxml block: {type(ooxml_block)}>")
+
+			effective_cells.append(Cell(loc=ooxml_cell.loc, blocks=effective_cell_content))
+
+		return effective_cells
+
+	def _compute_effective_rows(
+			self, ooxml_rows: list[OOXML_TABLE.TableRow], effective_table_style: Style, block_id: int
+		) -> list[Row]:
+		
+		# ! TODO: take into account styles
+
+		effective_rows: list[Row] = []
+
+		for ooxml_row in ooxml_rows:
+			effective_row_cells: list[Cell] = self._compute_effective_cells(
+				ooxml_cells=ooxml_row.cells, 
+				effective_row_style=effective_table_style,
+				block_id=block_id
+			)
+			effective_rows.append(Row(loc=ooxml_row.loc, cells=effective_row_cells))
+
+		return effective_rows
+		
+	
+	def compute_effective_table(self, ooxml_table: OOXML_TABLE.Table, block_id: int) -> Table:
+		print("!!!!")
+
+		# ! TODO: take into account table associated properties
+
+		if ooxml_table.style is not None:
+			effective_table_style: Style = self.effective_styles_from_ooxml.get(ooxml_style_id=ooxml_table.style.id)
+		else:
+			effective_table_style: Style = self.effective_styles_from_ooxml.get_default()
+
+		effective_table_rows: list[Row] = self._compute_effective_rows(
+			ooxml_rows=ooxml_table.rows, effective_table_style=effective_table_style, block_id=block_id
+		)
+
+		return Table(
+			id=block_id,
+			rows=effective_table_rows,
+			format=Format(style=effective_table_style)
+		)
 
 	def _compute_effective_blocks(self) -> None:
 		"""
@@ -197,7 +257,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		for block_id, ooxml_block in enumerate(self.ooxml_document.body):
 			match type(ooxml_block):
 				case OOXML_PARAGRAPH.Paragraph:
-					self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
+					self.effective_document[block_id] = self.compute_effective_paragraph(ooxml_paragraph=ooxml_block, block_id=block_id)
+				case OOXML_TABLE.Table:
+					self.effective_document[block_id] = self.compute_effective_table(ooxml_table=ooxml_block, block_id=block_id)
 				case _:
 					# ! TODO: Remove continue
 					continue
@@ -313,7 +375,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			if self._n_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
 				matches[effective_enumeration.id] = effective_enumeration_matches
 		
-		print("DETECTED MATCHES", self._n_matches(matches=matches))
 		# TODO: Document cases better
 		match self._n_matches(matches=matches):
 			case 0:
@@ -373,7 +434,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	def _remove_detected_index_from_effective_paragraph(self, effective_paragraph: Paragraph, detected_index: Index) -> None:
 
 		detected_level_key: int = next(level_key for level_key, level in detected_index.enumeration.levels.items() if detected_index.level.id == level.id)
-		print(detected_index.enumeration.detection_regexes[detected_level_key])
 
 		seen_runs: list[Text] = []
 		for i, run in enumerate(effective_paragraph.content):
