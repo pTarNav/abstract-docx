@@ -103,10 +103,9 @@ class AbstractDocx(ArbitraryBaseModel):
 		elif isinstance(curr_block, Table):
 			rich_table: RichTable = RichTable(show_header=False, show_lines=True)
 			for _ in range(len(curr_block.rows[0].cells)):
-				rich_table.add_column()
+				rich_table.add_column(no_wrap=True, max_width=64)
 
 			for row in curr_block.rows:
-				print([str(cell_content) for cell_content in row.cells])
 				rich_table.add_row(*[RichText(str(cell_content), style="white") for cell_content in row.cells])
 
 			rich_text_group: RichGroup = RichGroup(
@@ -133,7 +132,7 @@ class AbstractDocx(ArbitraryBaseModel):
 			for child in curr_block.children:
 				self._print_document(curr_block=child, prev_tree_node=curr_tree_node, depth=depth+1, include_metadata=include_metadata)
 
-	def print(self, include_metadata: bool = False) -> None:
+	def print(self, include_metadata: bool = False, collapse_tables: bool = False) -> None:
 		tree_root: Tree = Tree("Document")
 
 		self._print_document(curr_block=self.views.document.root, prev_tree_node=tree_root, include_metadata=include_metadata)
@@ -194,6 +193,6 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 if __name__ == "__main__":
 	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[0]}.docx")
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[2]}.docx")
 	x()
 	x.print()

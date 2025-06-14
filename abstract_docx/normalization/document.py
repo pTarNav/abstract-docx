@@ -231,7 +231,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		
 	
 	def compute_effective_table(self, ooxml_table: OOXML_TABLE.Table, block_id: int) -> Table:
-		print("!!!!")
 
 		# ! TODO: take into account table associated properties
 
