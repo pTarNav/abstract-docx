@@ -1,16 +1,23 @@
 from __future__ import annotations
 from typing import Optional
-import os
 import difflib
+
 
 def tree_edit_distance(pred: ParsedBlock, ground_truth: ParsedBlock) -> dict[str, float]:
 	"""
 	Zhang-Shasha algorithm
 	"""
-	import zss
-	class ZSSNode(zss.Node):
-		def __init__(self, label, children):
-			super().__init__(label=label, children=children)
+	from apted import APTED, Config
+
+	class MyConfig(Config):
+		def rename(self, node1, node2):
+			# cost 0 if equal, else 1
+			return 0 if node1.label == node2.label else 1
+
+	class ZSSNode:
+		def __init__(self, label, children=None):
+			self.label = label
+			self.children = children or []
 
 		@classmethod
 		def from_block(cls, block: ParsedBlock) -> ZSSNode:
@@ -22,7 +29,7 @@ def tree_edit_distance(pred: ParsedBlock, ground_truth: ParsedBlock) -> dict[str
 	pred_zss_root: ZSSNode = ZSSNode.from_block(block=pred)
 	ground_truth_zss_root: ZSSNode = ZSSNode.from_block(block=ground_truth)
 
-	return {"TED": zss.simple_distance(pred_zss_root, ground_truth_zss_root)}
+	return {"TED": APTED(pred_zss_root, ground_truth_zss_root, MyConfig()).compute_edit_distance()}
 
 def path_based_similarities(pred: ParsedBlock, ground_truth: ParsedBlock) -> dict[str, float]:
 	from itertools import takewhile, product
@@ -51,9 +58,8 @@ def path_based_similarities(pred: ParsedBlock, ground_truth: ParsedBlock) -> dic
 	fn: int = len(false_negatives)
 	# True negatives are not meaningful in the context
 
-	accuracy: float = tp/len(ground_truth_paths) if len(ground_truth_paths) != 0 else 1.0
-	precision: float = tp/(tp+fp) if (tp+fp) != 0 else 1.0
-	recall: float = tp/(tp+fn) if (tp+fn) != 0 else 1.0
+	precision: float = tp/(tp+fp) if (tp+fp) != 0 else 0.0
+	recall: float = tp/(tp+fn) if (tp+fn) != 0 else 0.0
 	f1: float = 2*precision*recall/(precision+recall) if (precision+recall) != 0 else 0.0
 	
 	def least_common_prefix(pred_path: tuple[str], ground_truth_path: tuple[str]) -> float:
@@ -68,11 +74,10 @@ def path_based_similarities(pred: ParsedBlock, ground_truth: ParsedBlock) -> dic
 
 		return len(lcs)/len(ground_truth_path)
 
-	total_lcp: float = sum(least_common_prefix(x, y) for x, y in product(pred_paths, ground_truth_paths))
-	total_lcs: float = sum(least_common_suffix(x, y) for x, y in product(pred_paths, ground_truth_paths))
+	total_lcp: float = sum(least_common_prefix(x, y) for x, y in product(pred_paths, ground_truth_paths))/len(list(product(pred_paths, ground_truth_paths)))
+	total_lcs: float = sum(least_common_suffix(x, y) for x, y in product(pred_paths, ground_truth_paths))/len(list(product(pred_paths, ground_truth_paths)))
 
 	return {
-		"Path accuracy": accuracy,
 		"Path precision": precision,
 		"Path recall": recall,
 		"Path F1": f1,
@@ -102,56 +107,80 @@ def edge_based_similarities(pred: ParsedBlock, ground_truth: ParsedBlock) -> dic
 	fn: int = len(false_negatives)
 	# True negatives are not meaningful in the context
 
-	accuracy: float = tp/len(ground_truth_edges) if len(ground_truth_edges) != 0 else 1.0
-	precision: float = tp/(tp+fp) if (tp+fp) != 0 else 1.0
-	recall: float = tp/(tp+fn) if (tp+fn) != 0 else 1.0
+	precision: float = tp/(tp+fp) if (tp+fp) != 0 else 0.0
+	recall: float = tp/(tp+fn) if (tp+fn) != 0 else 0.0
 	f1: float = 2*precision*recall/(precision+recall) if (precision+recall) != 0 else 0.0
 	
 	return {
-		"Edge accuracy": accuracy,
 		"Edge precision": precision,
 		"Edge recall": recall,
 		"Edge F1": f1
 	}
 
 def line_level_metrics(pred: list[str], ground_truth: list[str]) -> dict[str, float]:
-	pred: str[str] = set(pred)
+	pred: set[str] = set(pred)
 	ground_truth: set[str] = set(ground_truth)
 
 	intersection: set[str] = pred & ground_truth
 	union: set[str] = pred | ground_truth
 
-	precision: float = len(intersection)/len(ground_truth) if len(ground_truth) != 0 else 1.0
-	recall: float = len(intersection)/len(pred) if len(pred) != 0 else 1.0
-	jaccard: float = len(intersection)/len(union) if len(union) != 0 else 1.0
+	precision: float = len(intersection)/len(pred) if len(pred) != 0 else 0.0
+	recall: float = len(intersection)/len(ground_truth) if len(ground_truth) != 0 else 0.0
+	f1: float = 2*precision*recall/(precision+recall) if (precision+recall) != 0 else 0.0
+	jaccard: float = len(intersection)/len(union) if len(union) != 0 else 0.0
 
 	return {
 		"Line precision": precision,
 		"Line recall": recall,
+		"Line F1": f1,
 		"Line Jaccard": jaccard
 	}
 
-def word_level_metrics(pred: list[str], ground_truth: list[str]) -> dict[str, float]:
-	matcher = difflib.SequenceMatcher(None, pred, ground_truth)
+def first_word_level_metrics(pred: list[str], ground_truth: list[str], epsilon: float = 0.05) -> dict[str, float]:
+	import re
+	import jellyfish
+
+	pred_split_by_words: list[list[str]] = [re.split(r"\W+", l) for l in pred]
+	pred_with_only_first_words: list[str] = [
+		" ".join(l[:max(1,int(len(l)*epsilon))]) for l in pred_split_by_words
+	]
+	pred_without_first_words: list[str] = [
+		" ".join(l[max(1,int(len(l)*epsilon)):]) for l in pred_split_by_words
+	]
+	
+	ground_truth_split_by_words: list[list[str]] = [re.split(r"\W+", l) for l in ground_truth]
+	ground_truth_with_only_first_words: list[str] = [
+		" ".join(l[:max(1,int(len(l)*epsilon))]) for l in ground_truth_split_by_words
+	]
+	ground_truth_without_first_words: list[str] = [
+		" ".join(l[max(1,int(len(l)*epsilon)):]) for l in ground_truth_split_by_words
+	]
+	
+	matcher = difflib.SequenceMatcher(None, pred_without_first_words, ground_truth_without_first_words)
 	ratios = []
+	jaro = []
 
 	for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-		if tag == "equal":
-			for pred_line, ground_truth_line in zip(pred[i1:i2], ground_truth[j1:j2]):
+		if tag in ("equal", "replace"):
+			for pred_line, ground_truth_line in zip(
+				pred_with_only_first_words[i1:i2], ground_truth_with_only_first_words[j1:j2]
+			):
 				pred_words: list[str] = pred_line.split()
 				ground_truth_words: list[str] = ground_truth_line.split()
-				if len(pred_words) != 0 or len(ground_truth_words) != 0:
-					ratios.append(1.0 - difflib.SequenceMatcher(None, pred_words, ground_truth).ratio())
+				ratios.append(difflib.SequenceMatcher(None, pred_words, ground_truth_words).ratio())
+				jaro.append(jellyfish.jaro_winkler_similarity(pred_line, ground_truth_line))
 	
-	avg_ratio: float = sum(ratios)/len(ratios) if len(ratios) != 0 else 1.0
+	avg_ratio: float = sum(ratios)/len(ratios) if len(ratios) != 0 else 0.0
+	avg_jaro: float = sum(jaro)/len(jaro) if len(jaro) != 0 else 0.0
 
 	return {
-		"Average word similarity ratio on matching lines": avg_ratio
+		f"First-word edit-based similarity ratio @ eps={epsilon}": avg_ratio,
+		f"First-word Jaro similarity ratio @ eps={epsilon}": avg_jaro
 	}
 
 class ParsedBlock:
 	def __init__(self, text: str):
-		self.text: str = text
+		self.text: str = text.strip()
 		self.children: Optional[list[ParsedBlock]] = None
 
 	def add_child(self, child: ParsedBlock):
@@ -177,13 +206,14 @@ def parse_tree_from_lines(lines: list[str]) -> Optional[ParsedBlock]:
 
 	return root
 
-def evaluation(test_dir: str, file_name: str) -> dict[str, dict[str, float]]:
-	with open(f"{os.path.join(test_dir, file_name)}.txt", "r", encoding="utf-8", errors="replace") as f:
-		pred_f = f.readlines()
+def evaluation(file_path: str, ground_truth_file_path: str) -> dict[str, dict[str, float]]:
+	with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+		pred_f: list[str] = f.readlines()
 
+	pred_f: list[str] = [l for l in pred_f if len(l.strip()) != 0]
 	pred_root: ParsedBlock = parse_tree_from_lines(lines=pred_f)
 	
-	with open(f"{os.path.join(test_dir, 'ground_truths', file_name)}.txt", "r", encoding="utf-8", errors="replace") as f:
+	with open(ground_truth_file_path, "r", encoding="utf-8", errors="replace") as f:
 		ground_truth_f = f.readlines()
 
 	ground_truth_root: ParsedBlock = parse_tree_from_lines(lines=ground_truth_f)
@@ -196,15 +226,9 @@ def evaluation(test_dir: str, file_name: str) -> dict[str, dict[str, float]]:
 		},
 		"content": {
 			**line_level_metrics(pred=pred_f, ground_truth=ground_truth_f),
-			**word_level_metrics(pred=pred_f, ground_truth=ground_truth_f)
+			**first_word_level_metrics(pred=pred_f, ground_truth=ground_truth_f, epsilon=0.02),
+			**first_word_level_metrics(pred=pred_f, ground_truth=ground_truth_f),
+			**first_word_level_metrics(pred=pred_f, ground_truth=ground_truth_f, epsilon=0.1)
 		}
 	}
-
-if __name__ == "__main__":
-	unfccc_test_file_names: list[str] = ["sample3.docx", "A6.4-PROC-ACCR-002.docx"]
-	results: dict = {}
-	for file_name in unfccc_test_file_names:
-		results[file_name] = evaluation(test_dir="test/unfccc", file_name=file_name)
-
-	print(results)
 	
