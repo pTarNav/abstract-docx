@@ -142,7 +142,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		s = "\t"*depth
 		if block.level_indexes is not None:
 			s += block.format.index.enumeration.format(level_indexes=block.level_indexes)
-		if isinstance(block, Paragraph):
+		if isinstance(block, Paragraph) or isinstance(block, Table):
 			s += str(block)
 		else:
 			s += "@WORK_IN_PROGRESS@"
@@ -159,7 +159,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		for root in self.views.document.root.children:
 			s += self._to_text(block=root)
 		
-		output_file_path: str = f"{self.file_path}.txt" if output_file_path is not None else output_file_path
+		output_file_path: str = f"{self.file_path}.txt" if output_file_path is None else output_file_path
 		with open(output_file_path, "w+", encoding="utf-8") as f:
 			f.write(s)
 

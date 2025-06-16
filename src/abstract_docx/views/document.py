@@ -76,6 +76,12 @@ class Table(Block):
 	cell_merge_ranges: Optional[list[CellMergeRange]] = None
 	caption: Optional[Paragraph] = None
 
+	def __str__(self):
+		s: str = ""
+		for row in self.rows:
+			s += f"| {' | '.join([str(cell) for cell in row.cells])} |\n"
+			
+		return s
 
 class DocumentView(ArbitraryBaseModel):
 	blocks: dict[int, Block]
