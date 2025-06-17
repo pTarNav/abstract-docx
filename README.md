@@ -7,7 +7,7 @@ pip install -e "abstract-docx/."
 ```
 
 Sample usage:
-```
+```python
 from abstract_docx.main import AbstractDocx
 
 doc: AbstractDocx = AbstractDocx.read(file_path="<your-file-name>.docx") # Read and parse the .docx file
