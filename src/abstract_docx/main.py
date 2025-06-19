@@ -132,18 +132,24 @@ class AbstractDocx(ArbitraryBaseModel):
 			for child in curr_block.children:
 				self._print_document(curr_block=child, prev_tree_node=curr_tree_node, depth=depth+1, include_metadata=include_metadata)
 
-	def print(self, include_metadata: bool = False, collapse_tables: bool = False) -> None:
+	def print(self, file_path: Optional[str] = None, include_metadata: bool = False, collapse_tables: bool = False) -> None:
 		tree_root: Tree = Tree("Document")
 
 		self._print_document(curr_block=self.views.document.root, prev_tree_node=tree_root, include_metadata=include_metadata)
-		print(rich_tree_to_str(tree_root))
+		if file_path is not None:
+			with open(file_path, "w+", encoding="utf-8") as f:
+				print(rich_tree_to_str(tree_root), file=f)
+		else:
+			print(rich_tree_to_str(tree_root))
 	
 	def _to_text(self, block: Block, depth: int=0) -> str:
 		s = "\t"*depth
 		if block.level_indexes is not None:
 			s += block.format.index.enumeration.format(level_indexes=block.level_indexes)
-		if isinstance(block, Paragraph) or isinstance(block, Table):
+		if isinstance(block, Paragraph):
 			s += str(block)
+		elif isinstance(block, Table):
+			s += ("\n" + "\t"*depth).join([l for l in str(block).split("@NEWLINE@")])
 		else:
 			s += "@WORK_IN_PROGRESS@"
 		s += "\n"
@@ -169,7 +175,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		if block.level_indexes is not None:
 			data["numbering_str"] = block.format.index.enumeration.format(level_indexes=block.level_indexes)
 		
-		if isinstance(block, Paragraph):
+		if isinstance(block, Paragraph) or isinstance(block, Table):
 			data["text"] = str(block)
 		else:
 			data["text"] = "@WORK_IN_PROGRESS@"

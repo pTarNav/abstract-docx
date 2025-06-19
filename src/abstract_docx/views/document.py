@@ -64,7 +64,7 @@ class Cell(ArbitraryBaseModel):
 	blocks: list[Block]
 
 	def __str__(self):
-		return "".join([str(block) for block in self.blocks])  # TODO: it will fail for nested tables but cannot be bothered for now
+		return " ".join([str(block) for block in self.blocks])  # TODO: it will fail for nested tables but cannot be bothered for now
 
 class Row(ArbitraryBaseModel):
 	loc: int
@@ -79,7 +79,7 @@ class Table(Block):
 	def __str__(self):
 		s: str = ""
 		for row in self.rows:
-			s += f"| {' | '.join([str(cell) for cell in row.cells])} |\n"
+			s += f"| {' | '.join([str(cell).strip() for cell in row.cells])} |@NEWLINE@"
 			
 		return s
 
