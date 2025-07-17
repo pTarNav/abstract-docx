@@ -15,11 +15,6 @@ from ooxml_docx.structure.numberings import NumberingStyle, Numbering, OoxmlNumb
 from ooxml_docx.document.run import Run
 
 
-class OoxmlHyperlinkType(Enum):
-	INTERNAL = "internal"
-	EXTERNAL = "external"
-
-
 class BookmarkDelimiter(ArbitraryBaseModel):
 	parent: Optional[OoxmlElement] = None
 	previous: Optional[OoxmlElement] = None
@@ -54,6 +49,11 @@ class Bookmark(OoxmlElement):
 		:return: _description_
 		"""
 		return int(ooxml_bookmark_end.xpath_query(query="./@w:id", nullable=False, singleton=True))
+
+
+class OoxmlHyperlinkType(Enum):
+	INTERNAL = "internal"
+	EXTERNAL = "external"
 
 
 class Hyperlink(OoxmlElement):
@@ -134,7 +134,15 @@ class Hyperlink(OoxmlElement):
 		return rich_tree_to_str(self._tree_str_())
 	
 	def _tree_str_(self) -> Tree:
-		tree = Tree("hyperlink")
+		tree = Tree("[bold]Hyperlink[/bold]")
+		tree.add(f"[bold]Type[/bold]: '{self.type}'")
+		tree.add(f"[bold]Target[/bold]: '{self.target}'")
+
+		if len(self.content) != 0:
+			content_tree = tree.add("[bold cyan]Content[/bold cyan]")
+			for i, content in enumerate(self.content):
+				content_tree.add(content._tree_str_())
+
 		return tree
 
 

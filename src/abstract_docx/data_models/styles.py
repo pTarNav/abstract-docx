@@ -8,6 +8,7 @@ from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
+from ooxml_docx.structure.styles import OoxmlStyles
 
 
 class FontSize(float):
@@ -493,3 +494,4 @@ class StylesView(ArbitraryBaseModel):
 				return 1
 			case diff_priority if diff_priority > 0:
 				return -1
+

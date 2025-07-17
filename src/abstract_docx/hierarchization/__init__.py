@@ -3,8 +3,8 @@ from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 
-from abstract_docx.hierarchization.format.styles import HierarchicalStylesFromOoxml
-from abstract_docx.hierarchization.format.numberings import HierarchicalNumberingsFromOoxml
+from abstract_docx.hierarchization.styles import HierarchicalStylesFromOoxml
+from abstract_docx.hierarchization.numberings import HierarchicalNumberingsFromOoxml
 from abstract_docx.hierarchization.document import HierarchicalDocumentFromOoxml
 
 

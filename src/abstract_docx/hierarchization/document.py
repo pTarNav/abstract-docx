@@ -4,14 +4,14 @@ from enum import Enum
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.styles import StylesView, Style, StyleProperties
-from abstract_docx.views.format.numberings import NumberingsView
-from abstract_docx.views.document import Block, Paragraph
+from abstract_docx.data_models.styles import StylesView, Style, StyleProperties
+from abstract_docx.data_models.numberings import NumberingsView
+from abstract_docx.data_models.document import Block, Paragraph
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 
-from abstract_docx.hierarchization.format.styles import HierarchicalStylesFromOoxml
-from abstract_docx.hierarchization.format.numberings import HierarchicalNumberingsFromOoxml
+from abstract_docx.hierarchization.styles import HierarchicalStylesFromOoxml
+from abstract_docx.hierarchization.numberings import HierarchicalNumberingsFromOoxml
 
 
 class HierarchizationConflictResolution(Enum):

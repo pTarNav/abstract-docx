@@ -6,7 +6,7 @@ import ooxml_docx.structure.styles as OOXML_STYLES
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.styles import Style, StyleProperties
+from abstract_docx.data_models.styles import Style, StyleProperties
 
 
 # TODO: Maybe create an abstract template for the effective styles class, so no matter the source it always contains the same methods

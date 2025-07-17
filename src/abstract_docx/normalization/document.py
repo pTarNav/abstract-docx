@@ -7,15 +7,15 @@ import re
 import ooxml_docx.document.paragraph as OOXML_PARAGRAPH
 import ooxml_docx.document.table as OOXML_TABLE
 
-from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
-from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
+from abstract_docx.normalization.styles import EffectiveStylesFromOoxml
+from abstract_docx.normalization.numberings import EffectiveNumberingsFromOoxml
 
-from abstract_docx.views.format.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
-from abstract_docx.views.document import Paragraph, Run, Block, Text, Hyperlink, Table, Row, Cell
+from abstract_docx.data_models.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
+from abstract_docx.data_models.document import Paragraph, Run, Block, Hyperlink, Table, Row, Cell
 
 import ooxml_docx.document.run as OOXML_RUN
-from abstract_docx.views.format import Format
-from abstract_docx.views.format.numberings import Level, Numbering, Enumeration, Index
+from abstract_docx.data_models.document import Format
+from abstract_docx.data_models.numberings import Level, Numbering, Enumeration, Index
 
 from ooxml_docx.structure.document import OoxmlDocument
 from utils.pydantic import ArbitraryBaseModel
@@ -80,23 +80,29 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		return Run.from_ooxml(ooxml_run=ooxml_run, style=effective_run_style)
 
 	def _compute_effective_texts(
-			self, ooxml_texts: list[OOXML_RUN.Run | OOXML_PARAGRAPH.Hyperlink], effective_paragraph_style: Style, block_id: int
-		) -> list[Text]:
+			self,
+			ooxml_texts: list[OOXML_RUN.Run | OOXML_PARAGRAPH.Hyperlink],
+			effective_paragraph_style: Style, block_id: int
+		) -> list[Run]:
 
-		effective_texts: list[Text] = []
+		effective_texts: list[Run] = []
 		for ooxml_text in ooxml_texts:
 			# Use length of seen content since it may not match the original length due to normalization
 			text_id = len(effective_texts)
 			
-			curr_text: Optional[Text] = None
+			curr_text: Optional[Run] = None
 			if isinstance(ooxml_text, OOXML_RUN.Run):
-				run_id_str = f"__@PARAGRAPH={block_id}@RUN={text_id}__"
+				run_id_str: str = f"__@PARAGRAPH={block_id}@RUN={text_id}__"
 				curr_text: Run = self.compute_effective_run(
 					ooxml_run=ooxml_text, effective_paragraph_style=effective_paragraph_style, run_id_str=run_id_str
 				)
 					
 			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):
 				print("Hyperlink")
+				hyperlink_id_str: str = f"__@PARAGRAPH={block_id}@HYPERLINK={text_id}__"
+				print(hyperlink_id_str)
+
+				print(ooxml_text.content, ooxml_text.type, ooxml_text.target)
 
 			if curr_text is not None:
 				# Concatenate with previous text if possible
@@ -135,7 +141,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			else:
 				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get_default()
 
-		effective_paragraph_content: list[Text] = self._compute_effective_texts(
+		effective_paragraph_content: list[Run] = self._compute_effective_texts(
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
 
@@ -264,7 +270,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					continue
 					raise ValueError(f"Unexpected ooxml block: {type(ooxml_block)}>")
 
-	def _associate_effective_text_styles(self, effective_texts: list[Text]) -> None:
+	def _associate_effective_text_styles(self, effective_texts: list[Run]) -> None:
 		# TODO: Optimize this loop so the inner effective styles loop is only done once
 		for effective_text in effective_texts:
 			found_effective_style_match: bool = False
@@ -363,14 +369,14 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		numberings: list[Numbering] = self._resolve_enumerations_associated_numberings(enumerations=enumerations)
 		return ImplicitIndexMatches(numberings=numberings, enumerations=enumerations, levels=levels)
 
-	def _implicit_index_detection(self, effective_paragraph_content: list[Text]) -> Optional[Index | ImplicitIndexMatches]:
+	def _implicit_index_detection(self, effective_paragraph_content: list[Run]) -> Optional[Index | ImplicitIndexMatches]:
 		# Join all the text inside the paragraph content (keeping only the style of the first element).
 		# This is to avoid false negatives in the level detection.
-		full_text: Text = Text(text="".join([t.text for t in effective_paragraph_content]), style=effective_paragraph_content[0].style)
+		full_text: Run = Run(text="".join([t.text for t in effective_paragraph_content]), style=effective_paragraph_content[0].style)
 
 		matches: dict[str, dict[str, list[Level]]] = {}
 		for effective_enumeration in self.effective_numberings_from_ooxml.effective_enumerations.values():
-			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(text=full_text)
+			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(run=full_text)
 			if self._n_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
 				matches[effective_enumeration.id] = effective_enumeration_matches
 		
@@ -434,10 +440,10 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 		detected_level_key: int = next(level_key for level_key, level in detected_index.enumeration.levels.items() if detected_index.level.id == level.id)
 
-		seen_runs: list[Text] = []
+		seen_runs: list[Run] = []
 		for i, run in enumerate(effective_paragraph.content):
 			seen_runs.append(run)
-			partial_text: Text = Text(text="".join([t.text for t in seen_runs]), style=seen_runs[0].style)
+			partial_text: Run = Run(text="".join([t.text for t in seen_runs]), style=seen_runs[0].style)
 
 			if re.match(detected_index.enumeration.detection_regexes[detected_level_key], partial_text.text):
 				partial_text.text = re.sub(

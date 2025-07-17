@@ -12,7 +12,8 @@ from utils.pydantic import ArbitraryBaseModel
 import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
 from functools import cached_property
 
-from abstract_docx.views.format.styles import Style, RunStyleProperties, ParagraphStyleProperties
+from abstract_docx.data_models.styles import Style
+# from abstract_docx.data_models.document import Run
 
 class MarkerPattern(str):
 
@@ -366,6 +367,7 @@ class Level(ArbitraryBaseModel):
 		
 		raise ValueError("") # TODO
 
+
 class Enumeration(ArbitraryBaseModel):
 	id: str
 
@@ -419,7 +421,7 @@ class Enumeration(ArbitraryBaseModel):
 
 		return level_regexes
 
-	def detect(self, text: "Text") -> dict[str, list[Level]]:  # Type hint as string to avoid circular import hell
+	def detect(self, run: "Run") -> dict[str, list[Level]]:  # Type hint as string to avoid circular import hell
 		matches: dict[str, list[Level]] = {
 			"regex_and_style": [],
 			"regex_only": []
@@ -428,11 +430,11 @@ class Enumeration(ArbitraryBaseModel):
 		detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes
 		for level_id, level in self.levels.items():
 			if detection_regexes[level_id] is not None:		
-				match = re.match(self.detection_regexes[level_id], text.text)
+				match = re.match(self.detection_regexes[level_id], run.text)
 				if match is not None:
 					# Only take run style properties into account,
 					#  since using paragraph style properties too can lead to false negatives
-					if level.style.properties.run_style_properties == text.style.properties.run_style_properties:
+					if level.style.properties.run_style_properties == run.style.properties.run_style_properties:
 						matches["regex_and_style"].append(level)
 					else:
 						matches["regex_only"].append(level)

@@ -5,10 +5,10 @@ import ooxml_docx.structure.numberings as OOXML_NUMBERINGS
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.numberings import Numbering, Enumeration, LevelProperties, Level, Index
-from abstract_docx.views.format.styles import Style, StyleProperties
+from abstract_docx.data_models.numberings import Numbering, Enumeration, LevelProperties, Level, Index
+from abstract_docx.data_models.styles import Style, StyleProperties
 
-from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
+from abstract_docx.normalization.styles import EffectiveStylesFromOoxml
 
 
 # ! It is not inheriting any linkStyle style properties
