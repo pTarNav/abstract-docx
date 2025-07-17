@@ -45,7 +45,12 @@ class Run(ArbitraryBaseModel):
 
 class Hyperlink(ArbitraryBaseModel):
 	content: list[Run]
-	target: str
+	target: Optional[str] = None
+	style: Style
+	
+	@property
+	def text(self) -> str:
+		return "".join(run.text for run in self.content)
 
 
 PARAGRAPH_CONTENT = list[Run | Hyperlink]

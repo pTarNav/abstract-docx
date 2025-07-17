@@ -11,7 +11,7 @@ from abstract_docx.normalization.styles import EffectiveStylesFromOoxml
 from abstract_docx.normalization.numberings import EffectiveNumberingsFromOoxml
 
 from abstract_docx.data_models.styles import Style, StyleProperties, RunStyleProperties, ParagraphStyleProperties
-from abstract_docx.data_models.document import Paragraph, Run, Block, Hyperlink, Table, Row, Cell
+from abstract_docx.data_models.document import Paragraph, Run, Block, Hyperlink, Table, Row, Cell, PARAGRAPH_CONTENT
 
 import ooxml_docx.document.run as OOXML_RUN
 from abstract_docx.data_models.document import Format
@@ -82,15 +82,16 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	def _compute_effective_texts(
 			self,
 			ooxml_texts: list[OOXML_RUN.Run | OOXML_PARAGRAPH.Hyperlink],
-			effective_paragraph_style: Style, block_id: int
-		) -> list[Run]:
+			effective_paragraph_style: Style,
+			block_id: int
+		) -> list[PARAGRAPH_CONTENT]:
 
-		effective_texts: list[Run] = []
+		effective_texts: list[PARAGRAPH_CONTENT] = []
 		for ooxml_text in ooxml_texts:
 			# Use length of seen content since it may not match the original length due to normalization
 			text_id = len(effective_texts)
 			
-			curr_text: Optional[Run] = None
+			curr_text: Optional[PARAGRAPH_CONTENT] = None
 			if isinstance(ooxml_text, OOXML_RUN.Run):
 				run_id_str: str = f"__@PARAGRAPH={block_id}@RUN={text_id}__"
 				curr_text: Run = self.compute_effective_run(
@@ -101,8 +102,19 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				print("Hyperlink")
 				hyperlink_id_str: str = f"__@PARAGRAPH={block_id}@HYPERLINK={text_id}__"
 				print(hyperlink_id_str)
+				
+				hyperlink_content: list[Run] = []
+				for i, ooxml_run in enumerate(ooxml_text.content):
+					hyperlink_content.append(
+						self.compute_effective_run(
+							ooxml_run=ooxml_run,
+							effective_paragraph_style=effective_paragraph_style,
+							run_id_str=f"{hyperlink_id_str[:-2]}@RUN={i}__"
+						)
+					)
 
-				print(ooxml_text.content, ooxml_text.type, ooxml_text.target)
+				curr_text: Hyperlink = Hyperlink(content=hyperlink_content, target=ooxml_text.target, style=effective_paragraph_style) # TODO: Actually compute hyperlink style
+				print(curr_text)
 
 			if curr_text is not None:
 				# Concatenate with previous text if possible
@@ -141,7 +153,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			else:
 				effective_paragraph_style: Style = self.effective_styles_from_ooxml.get_default()
 
-		effective_paragraph_content: list[Run] = self._compute_effective_texts(
+		effective_paragraph_content: list[PARAGRAPH_CONTENT] = self._compute_effective_texts(
 			ooxml_texts=ooxml_paragraph.content, effective_paragraph_style=effective_paragraph_style, block_id=block_id
 		)
 
