@@ -98,23 +98,20 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					ooxml_run=ooxml_text, effective_paragraph_style=effective_paragraph_style, run_id_str=run_id_str
 				)
 					
-			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):
-				print("Hyperlink")
-				hyperlink_id_str: str = f"__@PARAGRAPH={block_id}@HYPERLINK={text_id}__"
-				print(hyperlink_id_str)
-				
+			elif isinstance(ooxml_text, OOXML_PARAGRAPH.Hyperlink):				
 				hyperlink_content: list[Run] = []
 				for i, ooxml_run in enumerate(ooxml_text.content):
 					hyperlink_content.append(
 						self.compute_effective_run(
 							ooxml_run=ooxml_run,
 							effective_paragraph_style=effective_paragraph_style,
-							run_id_str=f"{hyperlink_id_str[:-2]}@RUN={i}__"
+							run_id_str=f"__@PARAGRAPH={block_id}@HYPERLINK={text_id}@RUN={i}__"
 						)
 					)
 
-				curr_text: Hyperlink = Hyperlink(content=hyperlink_content, target=ooxml_text.target, style=effective_paragraph_style) # TODO: Actually compute hyperlink style
-				print(curr_text)
+				curr_text: Hyperlink = Hyperlink(
+					content=hyperlink_content, target=ooxml_text.target, style=effective_paragraph_style # TODO: Actually compute hyperlink style
+				)
 
 			if curr_text is not None:
 				# Concatenate with previous text if possible
