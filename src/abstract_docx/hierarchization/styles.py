@@ -4,7 +4,7 @@ from enum import Enum
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.styles import Style
+from abstract_docx.data_models.styles import Style
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 

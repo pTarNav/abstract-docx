@@ -4,12 +4,12 @@ from enum import Enum
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format.styles import StylesView
-from abstract_docx.views.format.numberings import Numbering, Enumeration, Level, MarkerType
+from abstract_docx.data_models.styles import StylesView
+from abstract_docx.data_models.numberings import Numbering, Enumeration, Level, MarkerType
 
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 
-from abstract_docx.hierarchization.format.styles import HierarchicalStylesFromOoxml
+from abstract_docx.hierarchization.styles import HierarchicalStylesFromOoxml
 
 
 class AvailableNumberingsPriorityParameters(Enum):

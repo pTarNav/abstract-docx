@@ -3,10 +3,16 @@ from typing import Optional
 
 from utils.pydantic import ArbitraryBaseModel
 
-from abstract_docx.views.format import Format
-from abstract_docx.views.format.styles import Style
+from abstract_docx.data_models.styles import Style
+from abstract_docx.data_models.numberings import Index
 
 import ooxml_docx.document.run as OOXML_RUN
+
+
+class Format(ArbitraryBaseModel):
+	style: Style
+	index: Optional[Index] = None
+
 
 class Block(ArbitraryBaseModel):
 	id: int
@@ -18,35 +24,39 @@ class Block(ArbitraryBaseModel):
 	# TODO: put level indexes inside index
 	level_indexes: Optional[dict[int, int]] = None
 
-# TODO: change Text for Run
-class Text(ArbitraryBaseModel):
+
+class Run(ArbitraryBaseModel):
 	text: str
 	style: Style
 
 	@classmethod
-	def from_ooxml(cls, ooxml_run: OOXML_RUN.Run, style: Style) -> Text:
+	def from_ooxml(cls, ooxml_run: OOXML_RUN.Run, style: Style) -> Run:
 		return cls(
 			text="".join([run_content.text for run_content in ooxml_run.content]),
 			style=style
 		)
 	
-	def concat(self, other: Text) -> None:
+	def concat(self, other: Run) -> None:
 		if self.style != other.style:
-			raise ValueError("Cannot concatenate two Texts that do not share the same style properties.")
+			raise ValueError("Cannot concatenate two Runs that do not share the same style properties.")
 
 		self.text += other.text
 
 
-class Run(Text):
-	pass
+class Hyperlink(ArbitraryBaseModel):
+	content: list[Run]
+	target: Optional[str] = None
+	style: Style
+	
+	@property
+	def text(self) -> str:
+		return "".join(run.text for run in self.content)
 
 
-class Hyperlink(Text):
-	target: str
-
+PARAGRAPH_CONTENT = list[Run | Hyperlink]
 
 class Paragraph(Block):
-	content: list[Text]
+	content: PARAGRAPH_CONTENT
 
 	def __str__(self):
 		return "".join([content.text for content in self.content])
@@ -83,10 +93,7 @@ class Table(Block):
 			
 		return s
 
+
 class DocumentView(ArbitraryBaseModel):
 	blocks: dict[int, Block]
 	root: Block
-
-	@classmethod
-	def load(cls, blocks: dict[int, Block], root: Block) -> DocumentView:
-		return cls(blocks=blocks, root=root)

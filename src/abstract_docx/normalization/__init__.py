@@ -3,8 +3,8 @@ from utils.pydantic import ArbitraryBaseModel
 
 from ooxml_docx.docx import OoxmlDocx
 
-from abstract_docx.normalization.format.styles import EffectiveStylesFromOoxml
-from abstract_docx.normalization.format.numberings import EffectiveNumberingsFromOoxml
+from abstract_docx.normalization.styles import EffectiveStylesFromOoxml
+from abstract_docx.normalization.numberings import EffectiveNumberingsFromOoxml
 from abstract_docx.normalization.document import EffectiveDocumentFromOoxml
 
 

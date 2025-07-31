@@ -9,8 +9,9 @@ from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
 
-from abstract_docx.views import AbstractDocxViews
-from abstract_docx.views.document import Block, Paragraph, Table
+
+from abstract_docx.data_models import Views
+from abstract_docx.data_models.document import Block, Paragraph, Table
 
 from rich.tree import Tree
 from rich.table import Table as RichTable
@@ -18,6 +19,7 @@ from rich.text import Text as RichText
 from rich.console import Group as RichGroup
 import colorsys
 from utils.printing import rich_tree_to_str
+
 
 class AbstractDocx(ArbitraryBaseModel):
 	"""
@@ -28,7 +30,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 	_effective_structure: Optional[EffectiveStructureFromOoxml] = None
 	_hierarchical_structure: Optional[HierarchicalStructureFromOoxml] = None
-	_views: Optional[AbstractDocxViews] = None
+	_views: Optional[Views] = None
 
 	@classmethod
 	def read(cls, file_path: str) -> AbstractDocx:
@@ -36,22 +38,22 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		return cls(file_path=file_path, ooxml_docx=ooxml_docx)
 	
-	@property
-	def effective_structure(self) -> EffectiveStructureFromOoxml:
-		if self._effective_structure is not None:
-			return self._effective_structure
+	# @property
+	# def effective_structure(self) -> EffectiveStructureFromOoxml:
+	# 	if self._effective_structure is not None:
+	# 		return self._effective_structure
 
-		raise ValueError("Please call")
+	# 	raise ValueError("Please call")
+	
+	# @property
+	# def hierarchical_structure(self) -> HierarchicalStructureFromOoxml:
+	# 	if self._hierarchical_structure is not None:
+	# 		return self._hierarchical_structure
+
+	# 	raise ValueError("Please call")
 	
 	@property
-	def hierarchical_structure(self) -> HierarchicalStructureFromOoxml:
-		if self._hierarchical_structure is not None:
-			return self._hierarchical_structure
-
-		raise ValueError("Please call")
-	
-	@property
-	def views(self) -> AbstractDocxViews:
+	def views(self) -> Views:
 		if self._views is not None:
 			return self._views
 
@@ -66,10 +68,10 @@ class AbstractDocx(ArbitraryBaseModel):
 			ooxml_docx=self.ooxml_docx
 		)
 		self._hierarchical_structure: HierarchicalStructureFromOoxml = HierarchicalStructureFromOoxml.hierarchization(
-			effective_structure_from_ooxml=self.effective_structure
+			effective_structure_from_ooxml=self._effective_structure
 		)
-		self._views: AbstractDocxViews = AbstractDocxViews.load(
-			effective_structure=self.effective_structure, hierarchical_structure=self.hierarchical_structure
+		self._views: Views = Views.load(
+			effective_structure=self._effective_structure, hierarchical_structure=self._hierarchical_structure
 		)		
 
 	def _print_document(self, curr_block: Block, prev_tree_node: Tree, depth: int = 0, include_metadata: bool = False) -> None:
@@ -199,7 +201,7 @@ class AbstractDocx(ArbitraryBaseModel):
 
 	
 if __name__ == "__main__":
-	test_files = ["sample3", "cp2022_10a01", "A6.4-PROC-ACCR-002", "SB004_report", "cop29_report_Add1"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[2]}.docx")
+	test_files = ["SB004_report", "cma6_report"]
+	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[1]}.docx")
 	x()
 	x.print()
