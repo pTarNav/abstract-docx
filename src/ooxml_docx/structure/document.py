@@ -11,6 +11,9 @@ from ooxml_docx.structure.numberings import OoxmlNumberings
 from ooxml_docx.document.paragraph import Paragraph
 from ooxml_docx.document.table import Table
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class OoxmlDocument(OoxmlElement):
 	body: list[Paragraph | Table] = []
@@ -62,7 +65,7 @@ class OoxmlDocument(OoxmlElement):
 			# because it allows the user to parse the other kinds of docx data through this tool
 			# "E.g. User wants to check and normalize the style hierarchy"
 			# Raises a warning instead of an error and proceed
-			print("\033[33m[Warning] No textual content detected inside the document...\033[0m")
+			logger.warning("No textual content detected inside the document.")
 			return []
 
 		content: list[Paragraph | Table] = []
