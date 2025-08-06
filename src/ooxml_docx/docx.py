@@ -77,7 +77,7 @@ class OoxmlDocx(ArbitraryBaseModel):
 			file_path=file_path, ooxml=OoxmlPackage.load(name=os.path.splitext(file_path)[0], content=contents)
 		)
 		ooxml_docx.build()
-		logger.debug(f".docx OOXML package structure built.")
+		logger.info(f".docx OOXML package structure built.")
 
 		return ooxml_docx
 	
