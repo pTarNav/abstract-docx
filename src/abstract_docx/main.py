@@ -20,6 +20,7 @@ import colorsys
 from utils.printing import rich_tree_to_str
 
 import logging
+from colorlog import ColoredFormatter
 logger = logging.getLogger(__name__)
 
 
@@ -34,13 +35,20 @@ class AbstractDocx(ArbitraryBaseModel):
 	_hierarchical_structure: Optional[HierarchicalStructureFromOoxml] = None
 	_views: Optional[Views] = None
 
-	@classmethod
-	def read(cls, file_path: str, logging_level: str) -> AbstractDocx:
-		logging.basicConfig(
-			level = logging._nameToLevel.get(logging_level.upper()),
-			format = "[%(asctime)s - %(name)s] %(levelname)s: %(message)s",
-			datefmt = "%Y-%m-%d %H:%M:%S",
+	@staticmethod
+	def _setup_logger(logging_level: str) -> None:
+		logging.basicConfig(level = logging._nameToLevel.get(logging_level.upper()))
+		formatter = ColoredFormatter(
+			"%(log_color)s[%(asctime)s - %(name)s] %(levelname)s: %(message)s",
+			datefmt="%Y-%m-%d %H:%M:%S",
 		)
+		# Swap out the handler’s formatter for the colored one
+		for handler in logging.root.handlers:
+			handler.setFormatter(formatter)
+
+	@classmethod
+	def read(cls, file_path: str, logging_level: str = "DEBUG") -> AbstractDocx:
+		cls._setup_logger(logging_level=logging_level)
 
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
 
