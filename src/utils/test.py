@@ -1,7 +1,7 @@
 import json
 
-from abstract_docx.core.main import AbstractDocx
-from abstract_docx.core.data_models.document import Block
+from abstract_docx.main import AbstractDocx
+from abstract_docx.data_models.document import Block
 
 
 def _test_output_tree_structure_and_numbering_at_block_level(block: Block, test_block: dict):
