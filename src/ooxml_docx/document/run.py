@@ -8,6 +8,9 @@ from ooxml_docx.ooxml import OoxmlElement
 from ooxml_docx.structure.properties import RunProperties
 from ooxml_docx.structure.styles import RunStyle, OoxmlStyles, OoxmlStyleTypes
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class RunContent(OoxmlElement):
 	text: str
@@ -113,8 +116,10 @@ class Run(OoxmlElement):
 			elif ooxml_element.local_name in RUN_SPECIAL_TEXT_TAGS:
 				element: SpecialRunText = SpecialRunText.parse(ooxml_special_text=ooxml_element)
 			else:
-				print("found strange run content", ooxml_element.local_name)
+				# ! TODO: Remove continue
+				logger.debug(f"Unexpected OOXML element inside a run: <w:{ooxml_element.local_name}>")
 				continue
+				raise ValueError(f"Unexpected OOXML element inside a ruh: <w:{ooxml_element.local_name}>")
 			content.append(element)
 
 		return content

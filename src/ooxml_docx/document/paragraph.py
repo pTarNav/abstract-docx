@@ -14,6 +14,9 @@ from ooxml_docx.structure.styles import ParagraphStyle, OoxmlStyles, OoxmlStyleT
 from ooxml_docx.structure.numberings import NumberingStyle, Numbering, OoxmlNumberings
 from ooxml_docx.document.run import Run
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BookmarkDelimiter(ArbitraryBaseModel):
 	parent: Optional[OoxmlElement] = None
@@ -213,8 +216,9 @@ class Paragraph(OoxmlElement):
 					)
 				case _:
 					# ! TODO: Remove continue
+					logger.debug(f"Unexpected OOXML element inside a paragraph: <w:{ooxml_element.local_name}>")
 					continue
-					raise ValueError(f"Unexpected OOXML element: <w:{ooxml_element.local_name}>")
+					raise ValueError(f"Unexpected OOXML element inside a paragraph: <w:{ooxml_element.local_name}>")
 			content.append(element)
 		
 		return content
@@ -260,18 +264,18 @@ class Paragraph(OoxmlElement):
 			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
 			
 			if numbering is None:
-				# In some cases (because of ooxml manipulation from external programs),
+				# In some cases (because of OOXML manipulation from external programs),
 				#  there is a numbering reference to an inexistent numbering instance.
 				# They are harmless and will be corrected in the abstract_docx normalization step.
 				# Raises a warning instead of an error and proceeds.
-				print(f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=}.\033[0m")
+				logger.warning(f"Inexistent numbering referenced: {numbering_id=}.")
 				return None				
 
 			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 			if indentation_level is None:
 				# Defaults to the lowest one specified inside the numbering definition
 				indentation_level = 0  # ! TODO: Check if this can be anything besides 0
-				print(f"\033[33m[Warning] Lowest indentation level assumption for a paragraph.\033[0m")
+				logger.warning(f"Lowest indentation level assumption for a paragraph with: {numbering=}.")
 			indentation_level = int(indentation_level)
 
 			return numbering, indentation_level

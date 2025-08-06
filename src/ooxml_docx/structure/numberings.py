@@ -10,6 +10,9 @@ from ooxml_docx.ooxml import OoxmlElement, OoxmlPart
 from ooxml_docx.structure.properties import RunProperties, ParagraphProperties
 from ooxml_docx.structure.styles import OoxmlStyleTypes, OoxmlStyles, ParagraphStyle, _NumberingStyle
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class NumberingStyle(_NumberingStyle):
 	"""_summary_
@@ -458,7 +461,7 @@ class Numbering(OoxmlElement):
 		# In some cases (because of ooxml manipulation from external programs),	
 		#  it might be assumed that the level to be used is the lowest one available.
 		# Raise a warning to log that this assumption has been made.
-		print(f"\033[33m[Warning] Lowest indentation level assumption made for: {style.id=}\033[0m")
+		logger.warning(f"Lowest indentation level assumption made for: {style.id=}")
 		return 0
 
 
@@ -509,9 +512,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 					#  there is a numbering reference to an inexistent numbering instance.
 					# They are harmless and will be corrected in the abstract_docx normalization step.
 					# Raises a warning instead of an error and proceeds.
-					print(
-						f"\033[33m[Warning] Inexistent numbering referenced: {numbering_id=} (inside {style.id=})\033[0m"
-					)			
+					logger.warning(f"Inexistent numbering referenced: {numbering_id=} (inside {style.id=})")
 
 			if style.children is not None:
 				self._associate_styles_and_numberings(styles=style.children, style_type=style_type)

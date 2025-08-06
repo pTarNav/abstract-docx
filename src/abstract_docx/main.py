@@ -9,7 +9,6 @@ from ooxml_docx.docx import OoxmlDocx
 from abstract_docx.normalization import EffectiveStructureFromOoxml
 from abstract_docx.hierarchization import HierarchicalStructureFromOoxml
 
-
 from abstract_docx.data_models import Views
 from abstract_docx.data_models.document import Block, Paragraph, Table
 
@@ -19,6 +18,10 @@ from rich.text import Text as RichText
 from rich.console import Group as RichGroup
 import colorsys
 from utils.printing import rich_tree_to_str
+
+import logging
+from colorlog import ColoredFormatter
+logger = logging.getLogger(__name__)
 
 
 class AbstractDocx(ArbitraryBaseModel):
@@ -32,8 +35,21 @@ class AbstractDocx(ArbitraryBaseModel):
 	_hierarchical_structure: Optional[HierarchicalStructureFromOoxml] = None
 	_views: Optional[Views] = None
 
+	@staticmethod
+	def _setup_logger(logging_level: str) -> None:
+		logging.basicConfig(level = logging._nameToLevel.get(logging_level.upper()))
+		formatter = ColoredFormatter(
+			"%(log_color)s[%(asctime)s - %(name)s] %(levelname)s: %(message)s",
+			datefmt="%Y-%m-%d %H:%M:%S",
+		)
+		# Swap out the handler’s formatter for the colored one
+		for handler in logging.root.handlers:
+			handler.setFormatter(formatter)
+
 	@classmethod
-	def read(cls, file_path: str) -> AbstractDocx:
+	def read(cls, file_path: str, logging_level: str = "DEBUG") -> AbstractDocx:
+		cls._setup_logger(logging_level=logging_level)
+
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
 
 		return cls(file_path=file_path, ooxml_docx=ooxml_docx)

@@ -12,6 +12,10 @@ from ooxml_docx.structure.styles import OoxmlStyles
 from ooxml_docx.structure.numberings import OoxmlNumberings
 from ooxml_docx.structure.document import OoxmlDocument
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 class OoxmlDocxStructure(ArbitraryBaseModel):
 	styles: OoxmlStyles  # Parses ooxml information about styles
 	numberings: OoxmlNumberings  # Parses ooxml information about numberings
@@ -19,18 +23,24 @@ class OoxmlDocxStructure(ArbitraryBaseModel):
 
 	@classmethod
 	def load(cls, docx: OoxmlDocx) -> OoxmlDocxStructure:
-		styles = OoxmlStyles.build(ooxml_styles_part=docx.ooxml.content["word"].content["styles.xml"])
 
+		logger.debug("Building OOXML styles part...")
+		styles = OoxmlStyles.build(ooxml_styles_part=docx.ooxml.content["word"].content["styles.xml"])
+		logger.debug("OOXML styles part built.")
+
+		logger.debug("Building OOXML numberings part...")
 		numberings = OoxmlNumberings.build(
 			ooxml_numbering_part=docx.ooxml.content["word"].content["numbering.xml"], styles=styles
 		)
+		logger.debug("OOXML numberings part built.")
 		
+		logger.debug("Building OOXML document part...")
 		document_relationships = OoxmlRelationships.parse(ooxml_rels=docx.ooxml.content["word"].relationships.content["document.xml.rels"].ooxml)
-		
 		document = OoxmlDocument.build(
 			ooxml_document_part=docx.ooxml.content["word"].content["document.xml"], 
 			styles=styles, numberings=numberings, relationships=document_relationships
 		)
+		logger.debug("OOXML document part built.")
 		
 		return cls(styles=styles, numberings=numberings, document=document)
 
@@ -60,11 +70,14 @@ class OoxmlDocx(ArbitraryBaseModel):
 					# ! TODO: Handle other file extensions inside the package
 					if f_name.endswith(".xml") or f_name.endswith(".rels"):
 						contents[f_name] = zip_ref.read(f_name)
-		
+		logger.debug(f"{file_path} contents read.")
+
+		logger.debug(f"Building .docx OOXML package structure...")
 		ooxml_docx: OoxmlDocx = cls(
 			file_path=file_path, ooxml=OoxmlPackage.load(name=os.path.splitext(file_path)[0], content=contents)
 		)
 		ooxml_docx.build()
+		logger.info(f".docx OOXML package structure built.")
 
 		return ooxml_docx
 	
