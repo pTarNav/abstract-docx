@@ -26,7 +26,23 @@ class ImplicitIndexMatches(ArbitraryBaseModel):
 	enumerations: list[Enumeration]
 	levels: list[Level]
 
-	detected_numbering_str: str
+	detected_index_str: str
+
+	_index_combinations: Optional[list[tuple[Numbering, Enumeration, Level]]] = None
+
+	@property
+	def index_combinations(self):
+		if self._index_combinations is None:
+			self._index_combinations = []
+			for numbering in self.numberings:
+				for enumeration in self.enumerations:
+					if enumeration.id in numbering.enumerations.keys():
+						possible_level_ids: list[str] = [l.id for l in enumeration.levels.values()]
+						for level in self.levels:
+							if level.id in possible_level_ids:
+								self._index_combinations.append((numbering, enumeration, level))
+
+		return self._index_combinations
 
 
 class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
@@ -342,6 +358,10 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			self.effective_numberings_from_ooxml.effective_numberings[associated_numbering_id] 
 			for associated_numbering_id in list(associated_numbering_ids)
 		]
+	
+	def _detected_index_str_from_effective_paragraph(self) -> str:
+		# ! TODO !!
+		return ""
 
 	def _implicit_index_detection(self, effective_paragraph_content: list[Run]) -> Optional[ImplicitIndexMatches]:
 		"""
@@ -360,7 +380,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		matches: dict[str, dict[str, list[Level]]] = {}
 		for effective_enumeration in self.effective_numberings_from_ooxml.effective_enumerations.values():
 			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(run=full_text)
-			if self._n_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
+			if self._n_implicit_index_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
 				matches[effective_enumeration.id] = effective_enumeration_matches
 		
 		n__matches: int = self._n_implicit_index_matches(matches=matches)
@@ -411,7 +431,12 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				]
 		
 		matched_numberings: list[Numbering] = self._resolve_enumerations_associated_numberings(enumerations=matched_enumerations)
-		return ImplicitIndexMatches(numberings=matched_numberings, enumerations=matched_enumerations, levels=matched_levels)
+		return ImplicitIndexMatches(
+			numberings=matched_numberings,
+			enumerations=matched_enumerations,
+			levels=matched_levels,
+			detected_index_str=self._detected_index_str_from_effective_paragraph() # TODO
+		)
 
 	def _remove_detected_index_str_from_effective_paragraph(self, effective_paragraph: Paragraph, detected_index: Index) -> None:
 		detected_level_key: int = next(level_key for level_key, level in detected_index.enumeration.levels.items() if detected_index.level.id == level.id)
@@ -445,7 +470,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				effective_block.format.index = effective_block_index
 			elif isinstance(effective_block, Paragraph):
 				# Do not try to find implicit enumerations and levels matches for other block types
-				# Because with tables, it is much more difficult for a user to manually set the numbering
+				# Because with tables, it is much more difficult for a user to set the numbering manually
 				if len(effective_block.content) > 0: # TODO; why?				
 					detected_implicit_index_matches: Optional[ImplicitIndexMatches] = self._implicit_index_detection(
 						effective_paragraph_content=effective_block.content
@@ -501,25 +526,26 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					active_levels = set()
 					active_matches_levels = []
 				print("levels\t", f"{len(b_iim.levels)=}", " & ", f"{len(active_levels)=}", " = ", f"{len(active_matches_levels)=}")
-				
-				if len(active_matches_numbering) == len(active_matches_enumeration) == 1:
-					print("!!!!!!!!")
-					print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]].levels.values()])
-					print(active_matches_levels)
-					print("!!!!!!!!")
+				print("index_combinations", f"{len(b_iim.index_combinations)=}")
 
-				if len(active_matches_enumeration) == 0 and len(active_enumerations) == 1:
-					print("@@@@@@@@")
-					print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()])
-					print([l.id for l in b_iim.levels])
-					print(set([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()]) & set([l.id for l in b_iim.levels]))
-					print("@@@@@@@@")
+				# if len(active_matches_numbering) == len(active_matches_enumeration) == 1:
+				# 	print("!!!!!!!!")
+				# 	print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]].levels.values()])
+				# 	print(active_matches_levels)
+				# 	print("!!!!!!!!")
 
-				if len(active_matches_numbering) == len(active_matches_enumeration) == len(active_matches_levels) == 1:
-					detected_active_index_match = Index(
-						numbering=self.effective_numberings_from_ooxml.effective_numberings[active_matches_numbering[0]],
-						enumeration=self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]],
-						level=self.effective_numberings_from_ooxml.effective_levels[active_matches_levels[0]]
-					)
-					b.format.index = detected_active_index_match
-					self._remove_detected_index_from_effective_paragraph(effective_paragraph=b, detected_index=detected_active_index_match)
+				# if len(active_matches_enumeration) == 0 and len(active_enumerations) == 1:
+				# 	print("@@@@@@@@")
+				# 	print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()])
+				# 	print([l.id for l in b_iim.levels])
+				# 	print(set([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()]) & set([l.id for l in b_iim.levels]))
+				# 	print("@@@@@@@@")
+
+				# if len(active_matches_numbering) == len(active_matches_enumeration) == len(active_matches_levels) == 1:
+				# 	detected_active_index_match = Index(
+				# 		numbering=self.effective_numberings_from_ooxml.effective_numberings[active_matches_numbering[0]],
+				# 		enumeration=self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]],
+				# 		level=self.effective_numberings_from_ooxml.effective_levels[active_matches_levels[0]]
+				# 	)
+				# 	b.format.index = detected_active_index_match
+				# 	self._remove_detected_index_from_effective_paragraph(effective_paragraph=b, detected_index=detected_active_index_match)

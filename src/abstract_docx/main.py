@@ -99,7 +99,7 @@ class AbstractDocx(ArbitraryBaseModel):
 			r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.5)
 			return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 		
-		if curr_block.format.index.index_ctr is not None:
+		if curr_block.format is not None and curr_block.format.index is not None and curr_block.format.index.index_ctr is not None:
 			curr_block_numbering_str: str = curr_block.format.index.enumeration.format(index_ctr=curr_block.format.index.index_ctr)
 		else:
 			curr_block_numbering_str: str = ""
