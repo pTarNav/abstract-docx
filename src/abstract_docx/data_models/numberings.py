@@ -379,16 +379,17 @@ class Enumeration(ArbitraryBaseModel):
 		
 		raise ValueError("") # TODO
 
-	def format(self, level_indexes: dict[int, int]) -> str:
-		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
-			raise KeyError("Level indexes could not be mapped to levels.")
+	def format(self, index_ctr: Optional[dict[int, int]]) -> str:
+		# TODO: raise rror if index_ctr is None
+		if not all([lk in self.levels.keys() for lk in index_ctr.keys()]):
+			raise KeyError("Index counters could not be mapped to levels.")
 		
 		level_strings: dict[int, str] = {}
-		for k, v in level_indexes.items():
+		for k, v in index_ctr.items():
 			level_strings[k] = self.levels[k].properties.marker_type.format(index=v)
 		
-		marker_pattern: str = self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
-		whitespace: str = self.levels[max(level_indexes.keys())].properties.whitespace.format()
+		marker_pattern: str = self.levels[max(index_ctr.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+		whitespace: str = self.levels[max(index_ctr.keys())].properties.whitespace.format()
 		return f"{marker_pattern}{whitespace}"
 			
 	

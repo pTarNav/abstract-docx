@@ -99,8 +99,8 @@ class AbstractDocx(ArbitraryBaseModel):
 			r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.5)
 			return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 		
-		if curr_block.level_indexes is not None:
-			curr_block_numbering_str: str = curr_block.format.index.enumeration.format(level_indexes=curr_block.level_indexes)
+		if curr_block.format.index.index_ctr is not None:
+			curr_block_numbering_str: str = curr_block.format.index.enumeration.format(index_ctr=curr_block.format.index.index_ctr)
 		else:
 			curr_block_numbering_str: str = ""
 
@@ -117,7 +117,7 @@ class AbstractDocx(ArbitraryBaseModel):
 				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
+				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr}")
 		elif isinstance(curr_block, Table):
 			rich_table: RichTable = RichTable(show_header=False, show_lines=True)
 			for _ in range(len(curr_block.rows[0].cells)):
@@ -138,7 +138,7 @@ class AbstractDocx(ArbitraryBaseModel):
 				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.level_indexes}")
+				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr}")
 		else:
 			rich_text: RichText = (
 				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
@@ -162,8 +162,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 	def _to_text(self, block: Block, depth: int=0) -> str:
 		s = "\t"*depth
-		if block.level_indexes is not None:
-			s += block.format.index.enumeration.format(level_indexes=block.level_indexes)
+		if block.format.index.index_ctr is not None:
+			s += block.format.index.enumeration.format(index_ctr=block.format.index.index_ctr)
 		if isinstance(block, Paragraph):
 			s += str(block)
 		elif isinstance(block, Table):
@@ -190,8 +190,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	def _to_json(self, block: Block) -> dict:
 		data: dict = {"id": block.id}
 
-		if block.level_indexes is not None:
-			data["numbering_str"] = block.format.index.enumeration.format(level_indexes=block.level_indexes)
+		if block.format.index.index_ctr is not None:
+			data["numbering_str"] = block.format.index.enumeration.format(index_ctr=block.format.index.index_ctr)
 		
 		if isinstance(block, Paragraph) or isinstance(block, Table):
 			data["text"] = str(block)

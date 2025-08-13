@@ -23,7 +23,7 @@ DEFAULT_HIERARCHIZATION_CONFLICT_RESOLUTION: HierarchizationConflictResolution =
 
 class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 	root: Block
-	computed_numbering_level_indexes: dict[int, dict[int, Optional[int]]]
+	computed_numbering_index_ctr: dict[int, dict[int, Optional[int]]]
 
 	effective_structure_from_ooxml: EffectiveStructureFromOoxml
 
@@ -67,7 +67,7 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 
 		hierarchical_document_from_ooxml: HierarchicalDocumentFromOoxml = cls(
 			root=Block(id=-1),
-			computed_numbering_level_indexes={},
+			computed_numbering_index_ctr={},
 			effective_structure_from_ooxml=effective_structure_from_ooxml,
 			styles_view=styles_view,
 			numberings_view=numberings_view,
@@ -140,8 +140,8 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 			if indentation_level is None:
 				raise ValueError("") # TODO
 			
-			if self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] is None:
-				self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] = (
+			if self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][indentation_level] is None:
+				self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][indentation_level] = (
 					self.numberings_view
 					.enumerations[curr_block.format.index.enumeration.id].levels[indentation_level].properties.start
 				)
@@ -152,23 +152,23 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 					and curr_block.format.index.level.properties.override_start != -1
 				):  
 				# Start override (change of numbering)
-					self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] = (
+					self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][indentation_level] = (
 						self.numberings_view
 						.enumerations[curr_block.format.index.enumeration.id].levels[indentation_level].properties.start
 					)
 				else:
-					self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][indentation_level] += 1
+					self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][indentation_level] += 1
 
 			# Restart logic
 			for level_id in range(
-				indentation_level + 1, len(self.computed_numbering_level_indexes[curr_block.format.index.numbering.id].keys())
+				indentation_level + 1, len(self.computed_numbering_index_ctr[curr_block.format.index.numbering.id].keys())
 			):
 				match (
 					self.numberings_view
 					.enumerations[curr_block.format.index.enumeration.id].levels[level_id].properties.restart
 				):
 					case -1:
-						self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][level_id] = (
+						self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][level_id] = (
 							self.numberings_view
 							.enumerations[curr_block.format.index.enumeration.id].levels[level_id].properties.start - 1
 						)
@@ -181,22 +181,22 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 							.enumerations[curr_block.format.index.enumeration.id].levels[level_id].properties.restart 
 							== curr_block.format.index.level.id + 1
 						):
-							self.computed_numbering_level_indexes[curr_block.format.index.numbering.id][level_id] = (
+							self.computed_numbering_index_ctr[curr_block.format.index.numbering.id][level_id] = (
 								self.numberings_view
 								.enumerations[curr_block.format.index.enumeration.id].levels[level_id].properties.start - 1
 							)
 
-			displayed_level_indexes = {
-				k: v for k, v in self.computed_numbering_level_indexes[curr_block.format.index.numbering.id].items()
+			displayed_index_ctr = {
+				k: v for k, v in self.computed_numbering_index_ctr[curr_block.format.index.numbering.id].items()
 				if v is not None and k <= indentation_level
 			}
-			curr_block.level_indexes = displayed_level_indexes
+			curr_block.format.index.index_ctr = displayed_index_ctr
 
 	def compute(self) -> None:
 		for numbering in self.numberings_view.numberings.values():
 			if len(numbering.enumerations) > 0:
 				max_indentation_level: int = max([len(enumeration.levels.keys()) for enumeration in numbering.enumerations.values()])
-				self.computed_numbering_level_indexes[numbering.id] = {i: None for i in range(max_indentation_level)}
+				self.computed_numbering_index_ctr[numbering.id] = {i: None for i in range(max_indentation_level)}
 
 		prev_block: Block = self.root
 		for block in self.effective_structure_from_ooxml.document.effective_document.values():
