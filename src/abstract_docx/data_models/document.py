@@ -21,9 +21,6 @@ class Block(ArbitraryBaseModel):
 	parent: Optional[Block] = None
 	children: Optional[list[Block]] = None
 
-	# TODO: put level indexes inside index
-	level_indexes: Optional[dict[int, int]] = None
-
 
 class Run(ArbitraryBaseModel):
 	text: str

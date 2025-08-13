@@ -214,10 +214,3 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		with open(f"{self.file_path}.json", "w+", encoding="utf-8") as f:
 			f.write(json_data)
-
-	
-if __name__ == "__main__":
-	test_files = ["SB004_report", "cma6_report"]
-	x = AbstractDocx.read(file_path=f"test/unfccc/{test_files[1]}.docx")
-	x()
-	x.print()

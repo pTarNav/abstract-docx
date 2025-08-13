@@ -453,6 +453,9 @@ class Index(ArbitraryBaseModel):
 	enumeration: Enumeration
 	level: Level
 
+	index_str: Optional[str] = None
+	index_ctr: Optional[dict[int, int]] = None
+
 
 class NumberingsView(ArbitraryBaseModel):
 	numberings: dict[int, Numbering]
