@@ -28,7 +28,7 @@ class ImplicitIndexMatches(ArbitraryBaseModel):
 
 	detected_index_str: str
 
-	_index_combinations: Optional[list[tuple[Numbering, Enumeration, Level]]] = None
+	_index_combinations: Optional[list[Index]] = None
 
 	@property
 	def index_combinations(self):
@@ -40,7 +40,9 @@ class ImplicitIndexMatches(ArbitraryBaseModel):
 						possible_level_ids: list[str] = [l.id for l in enumeration.levels.values()]
 						for level in self.levels:
 							if level.id in possible_level_ids:
-								self._index_combinations.append((numbering, enumeration, level))
+								self._index_combinations.append(
+									Index(numbering=numbering, enumeration=enumeration, level=level)
+								)
 
 		return self._index_combinations
 
@@ -565,9 +567,50 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 				prev_effective_block = effective_block
 
+	def _resolve_implicit_indexes(self) -> None:
+		groups: dict[str, set[tuple[str, str, str]]] = {}
+		_map_to_groups: dict[int, str] = {}
+		
+
+		for effective_block in self.effective_document.values():
+			if effective_block.format.index is None and effective_block.id in self.implicit_index_matches.keys():
+				index_combinations_set: set[tuple[str, str, str]] = set(
+					(index_combination.numbering.id, index_combination.enumeration.id, index_combination.level.id)
+					for index_combination in self.implicit_index_matches[effective_block.id].index_combinations
+				)
+				
+				duplicated_in_group: Optional[str] = None
+				for group_id, grouped_index_combinations_set in groups.items():
+					if index_combinations_set == grouped_index_combinations_set:
+						duplicated_in_group = group_id
+						break
+
+				if duplicated_in_group is not None:
+					new_group_id = f"{duplicated_in_group}&{effective_block.id}"
+					groups[new_group_id] = groups.pop(duplicated_in_group)
+					
+					_map_to_groups[effective_block.id] = new_group_id
+					for k, v in _map_to_groups.items():
+						if v == duplicated_in_group:
+							_map_to_groups[k] = new_group_id
+				else:
+					groups[str(effective_block.id)] = index_combinations_set
+					_map_to_groups[effective_block.id] = str(effective_block.id)
+
+		print("number of groups with unique implicit index matches:", len(groups))
+
+		for effective_block in self.effective_document.values():
+			if effective_block.format.index is None and effective_block.id in self.implicit_index_matches.keys():
+				print(f"-- IMPLICIT INDEX -- {effective_block.id=}")
+				implicit_index_matches: ImplicitIndexMatches = self.implicit_index_matches[effective_block.id]
+				print(f"{len(implicit_index_matches.numberings)=}", f"{len(implicit_index_matches.enumerations)=}", f"{len(implicit_index_matches.levels)=}", f"{len(implicit_index_matches.index_combinations)=}")
+				print(f"=> {_map_to_groups[effective_block.id]}")
+
+
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		self._associate_effective_block_styles()
 		self._associate_effective_block_index()
 		self._resolve_explicit_indexes()
+		self._resolve_implicit_indexes()
 		
