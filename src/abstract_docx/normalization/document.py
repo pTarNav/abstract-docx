@@ -54,6 +54,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 	implicit_index_matches: dict[int, ImplicitIndexMatches] = {}
 
+	# Parameters
 	# TODO: parameterize in the input of normalization()
 	_allow_partial_implicit_index_matches: bool = True
 
@@ -265,7 +266,6 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 		return effective_rows
 		
-	
 	def compute_effective_table(self, ooxml_table: OOXML_TABLE.Table, block_id: int) -> Table:
 
 		# ! TODO: take into account table associated properties
@@ -493,59 +493,81 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 							# TODO: need to somehow keep the removed index str from the paragraph to later perform assumption check
 						else:
 							self.implicit_index_matches[effective_block.id] = detected_implicit_index_matches
-					
+
+	def _resolve_explicit_indexes(self) -> None:
+		computed_numberings_index_ctr: dict[int, dict[int, Optional[int]]] = {}
+
+		# Initialized numberings index counters
+		for numbering in self.effective_numberings_from_ooxml.effective_numberings.values():
+			if len(numbering.enumerations) > 0:
+				max_indentation_level: int = max([len(enumeration.levels.keys()) for enumeration in numbering.enumerations.values()])
+				computed_numberings_index_ctr[numbering.id] = {i: None for i in range(max_indentation_level)}
+
+		prev_effective_block: Optional[Block] = None
+		for effective_block in self.effective_document.values():
+			if effective_block.format.index is not None:
+				# ! TODO: Maybe its stupid to have to check the level key all the time like this
+				indentation_level: Optional[int] = next((ordered_level_id for ordered_level_id, level in effective_block.format.index.enumeration.levels.items() if level.id == effective_block.format.index.level.id), None)
+				if indentation_level is None:
+					raise ValueError("") # TODO
+				
+				if computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] is None:
+					computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
+						self.effective_numberings_from_ooxml
+						.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
+					)
+				else:
+					if (
+						prev_effective_block is not None and prev_effective_block.format.index is not None 
+						and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
+						and effective_block.format.index.level.properties.override_start != -1
+					):  
+						# Start override (change of numbering)
+						computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
+							self.effective_numberings_from_ooxml
+							.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
+						)
+					else:
+						computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
+
+				# Restart logic
+				for level_id in range(
+					indentation_level + 1, len(computed_numberings_index_ctr[effective_block.format.index.numbering.id].keys())
+				):
+					match (
+						self.effective_numberings_from_ooxml
+						.effective_enumerations[effective_block.format.index.enumeration.id].levels[level_id].properties.restart
+					):
+						case -1:
+							computed_numberings_index_ctr[effective_block.format.index.numbering.id][level_id] = (
+								self.effective_numberings_from_ooxml
+								.effective_enumerations[effective_block.format.index.enumeration.id].levels[level_id].properties.start - 1
+							)
+						case 0:
+							pass
+						case _:
+							# TODO implement this if better into the match case, also what happens if for some reason the restart happens when a new instance of a lower level happens
+							if (
+								self.effective_numberings_from_ooxml
+								.effective_enumerations[effective_block.format.index.enumeration.id].levels[level_id].properties.restart 
+								== effective_block.format.index.level.id + 1
+							):
+								computed_numberings_index_ctr[effective_block.format.index.numbering.id][level_id] = (
+									self.effective_numberings_from_ooxml
+									.effective_enumerations[effective_block.format.index.enumeration.id].levels[level_id].properties.start - 1
+								)
+
+				displayed_index_ctr = {
+					k: v for k, v in computed_numberings_index_ctr[effective_block.format.index.numbering.id].items()
+					if v is not None and k <= indentation_level
+				}
+				effective_block.format.index.index_ctr = displayed_index_ctr
+
+				prev_effective_block = effective_block
+
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		self._associate_effective_block_styles()
 		self._associate_effective_block_index()
-
-		# TODO: do this beautifully
-		active_numberings = set()
-		active_enumerations = set()
-
-		for b in self.effective_document.values():
-			if b.format.index is not None:
-				active_numberings.add(b.format.index.numbering.id)
-				active_enumerations.add(b.format.index.enumeration.id)
-
-		for b in self.effective_document.values():
-			b_iim = self.implicit_index_matches.get(b.id)
-			if b_iim is not None :
-				print("------ IMPLICIT INDEX MATCH ---------", f"{b.id=}", "\t", b.__str__()[:64])
-				
-				active_matches_numbering = list(set([n.id for n in b_iim.numberings]) & active_numberings)
-				print("numberings\t", f"{len(b_iim.numberings)=}", " & ", f"{len(active_numberings)=}", " = ", f"{len(active_matches_numbering)=}")
-				
-				active_matches_enumeration = list(set([e.id for e in b_iim.enumerations]) & active_enumerations)				
-				print("enumerations\t", f"{len(b_iim.enumerations)=}", " & ", f"{len(active_enumerations)=}", " = ", f"{len(active_matches_enumeration)=}")
-				
-				if len(active_enumerations) != 0:
-					active_levels: set[str] = set([level.id for i in range(len(active_enumerations)) for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[i]].levels.values()])
-					active_matches_levels = list(set([l.id for l in b_iim.levels]) & active_levels)
-				else:
-					active_levels = set()
-					active_matches_levels = []
-				print("levels\t", f"{len(b_iim.levels)=}", " & ", f"{len(active_levels)=}", " = ", f"{len(active_matches_levels)=}")
-				print("index_combinations", f"{len(b_iim.index_combinations)=}")
-
-				# if len(active_matches_numbering) == len(active_matches_enumeration) == 1:
-				# 	print("!!!!!!!!")
-				# 	print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]].levels.values()])
-				# 	print(active_matches_levels)
-				# 	print("!!!!!!!!")
-
-				# if len(active_matches_enumeration) == 0 and len(active_enumerations) == 1:
-				# 	print("@@@@@@@@")
-				# 	print([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()])
-				# 	print([l.id for l in b_iim.levels])
-				# 	print(set([level.id for level in self.effective_numberings_from_ooxml.effective_enumerations[list(active_enumerations)[0]].levels.values()]) & set([l.id for l in b_iim.levels]))
-				# 	print("@@@@@@@@")
-
-				# if len(active_matches_numbering) == len(active_matches_enumeration) == len(active_matches_levels) == 1:
-				# 	detected_active_index_match = Index(
-				# 		numbering=self.effective_numberings_from_ooxml.effective_numberings[active_matches_numbering[0]],
-				# 		enumeration=self.effective_numberings_from_ooxml.effective_enumerations[active_matches_enumeration[0]],
-				# 		level=self.effective_numberings_from_ooxml.effective_levels[active_matches_levels[0]]
-				# 	)
-				# 	b.format.index = detected_active_index_match
-				# 	self._remove_detected_index_from_effective_paragraph(effective_paragraph=b, detected_index=detected_active_index_match)
+		self._resolve_explicit_indexes()
+		
