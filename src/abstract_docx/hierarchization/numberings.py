@@ -105,6 +105,7 @@ class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
 		Returns 1 if level has higher priority than the level priority representative
 		"""
 
+		# TODO: If two levels are from the same enumeration, the priority difference should be given by their position in the enumeration
 		for priority in self.numberings_priority_parameters:
 			priority: MarkerType = MarkerType(priority.value)
 			

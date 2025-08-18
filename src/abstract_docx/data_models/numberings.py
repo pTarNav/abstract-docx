@@ -58,7 +58,7 @@ class MarkerPattern(str):
 		return super().format(*complete_ordered_level_strings)
 
 
-def to_letters(n: int) -> str:
+def _to_letters(n: int) -> str:
 	"""Convert a 1-based index to letters (A, B, ..., Z, AA, AB, ...)."""
 	result = ""
 	while n > 0:
@@ -128,15 +128,15 @@ class MarkerType(Enum):
 				except ValueError:
 					return str(index)
 			case MarkerType.DECIMAL_ORDINAL:
-				return num2words(index, to="ordinal_num")
+				return num2words(index, to="ordinal_num") # TODO: other language support
 			case MarkerType.CARDINAL:
 				return num2words(index, to="cardinal")
 			case MarkerType.ORDINAL:
 				return num2words(index, to="ordinal")
 			case MarkerType.LOWER_LETTER:
-				return to_letters(index).lower()
+				return _to_letters(index).lower()
 			case MarkerType.UPPER_LETTER:
-				return to_letters(index).upper()
+				return _to_letters(index).upper()
 			case MarkerType.LOWER_ROMAN:
 				return roman.toRoman(index).lower()
 			case MarkerType.UPPER_ROMAN:
@@ -187,6 +187,34 @@ class MarkerType(Enum):
 			case MarkerType.UPPER_ROMAN:
 				return r"[IVXLCDM]+"
 
+	def counter(self, s: str) -> int:
+		"""Parse a marker string and return its integer counter value (1-based)."""
+		match self:
+			case MarkerType.NONE:
+				return 0
+			case MarkerType.BULLET:
+				return 0
+			case MarkerType.DECIMAL | MarkerType.DECIMAL_LEADING_ZERO:
+				return int(s)
+			case MarkerType.DECIMAL_ENCLOSED_CIRCLE:
+				# Unicode circled numbers start at ① (U+2460) for 1
+				code_point = ord(s)
+				if 0x2460 <= code_point <= 0x2473:
+					return code_point - 0x2460 + 1
+				raise ValueError(f"Invalid circled decimal: {s}")
+			case MarkerType.DECIMAL_ORDINAL:
+				return int(re.match(r"(\d+)", s).group(1))
+			case MarkerType.CARDINAL:
+				raise NotImplementedError("Sorry will work on it") # TODO:
+			case MarkerType.ORDINAL:
+				raise NotImplementedError("Sorry will work on it") # TODO:
+			case MarkerType.LOWER_LETTER | MarkerType.UPPER_LETTER:
+				return sum((ord(c) - 96)*(26**i) for i, c in enumerate(reversed(s.lower())))
+			case MarkerType.LOWER_ROMAN | MarkerType.UPPER_ROMAN:
+				return roman.fromRoman(s)
+			case _:
+				raise NotImplementedError(f"No '.counter()' implementation for {self}")
+		
 
 class Whitespace(Enum):
 	NONE = "none"
@@ -211,11 +239,11 @@ class Whitespace(Enum):
 	def format(self) -> str:
 		match self:
 			case Whitespace.NONE:
-				return r""
+				return ""
 			case Whitespace.SPACE:
-				return r" "
+				return " "
 			case Whitespace.TAB:
-				return r"\t"
+				return "\t"
 
 	def detection_regex(self) -> str:
 		match self:
@@ -391,7 +419,6 @@ class Enumeration(ArbitraryBaseModel):
 		marker_pattern: str = self.levels[max(index_ctr.keys())].properties.marker_pattern.format(levels_strings=level_strings)
 		whitespace: str = self.levels[max(index_ctr.keys())].properties.whitespace.format()
 		return f"{marker_pattern}{whitespace}"
-			
 	
 	@cached_property
 	def detection_regexes(self) -> dict[int, Optional[re.Pattern]]:
@@ -434,7 +461,7 @@ class Enumeration(ArbitraryBaseModel):
 				match = re.match(self.detection_regexes[level_id], run.text)
 				if match is not None:
 					# Only take run style properties into account,
-					#  since using paragraph style properties too can lead to false negatives
+					# since using paragraph style properties too can lead to false negatives
 					if level.style.properties.run_style_properties == run.style.properties.run_style_properties:
 						matches["regex_and_style"].append(level)
 					else:
@@ -454,9 +481,20 @@ class Index(ArbitraryBaseModel):
 	enumeration: Enumeration
 	level: Level
 
-	index_str: Optional[str] = None
+	_index_str: Optional[str] = None
 	index_ctr: Optional[dict[int, int]] = None
 
+	@property
+	def index_str(self):
+		if self._index_str is None:
+			self._index_str = self.enumeration.format(index_ctr=self.index_ctr)
+		
+		return self._index_str
+
+class ImpliedIndex(ArbitraryBaseModel):
+	level: Level
+	index_ctr: int
+	index_str: str
 
 class NumberingsView(ArbitraryBaseModel):
 	numberings: dict[int, Numbering]

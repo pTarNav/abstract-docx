@@ -117,7 +117,7 @@ class AbstractDocx(ArbitraryBaseModel):
 				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr}")
+				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 		elif isinstance(curr_block, Table):
 			rich_table: RichTable = RichTable(show_header=False, show_lines=True)
 			for _ in range(len(curr_block.rows[0].cells)):
@@ -138,7 +138,7 @@ class AbstractDocx(ArbitraryBaseModel):
 				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr}")
+				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 		else:
 			rich_text: RichText = (
 				RichText(f'[{curr_block.id}] ', style=node_style(d=depth)) 
