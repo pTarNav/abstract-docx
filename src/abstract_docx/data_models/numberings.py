@@ -436,7 +436,10 @@ class Enumeration(ArbitraryBaseModel):
 					_marker_templated_escaped = marker_template_escaped
 					for _k in range(0, k+1):
 						if level_indexes_regexes[_k] is not None:
-							marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"(?:{level_indexes_regexes[_k]})")	
+							if _k == k: # Make capturing group for the level key
+								marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"({level_indexes_regexes[_k]})")
+							else:
+								marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"(?:{level_indexes_regexes[_k]})")
 
 					if marker_template_escaped != _marker_templated_escaped:
 						level_regexes[k] = rf"^{marker_template_escaped}{v.properties.whitespace.detection_regex()}"

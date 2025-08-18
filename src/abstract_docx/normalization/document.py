@@ -450,11 +450,10 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			# ! TODO: Maybe its stupid to have to check the level key all the time like this
 			detected_level_key: int = next(level_key for level_key, level in dummy_enumeration.levels.items() if dummy_level.id == level.id)
 
-			# Extract the level key contents inside the detected index string
-			regex_level_key_index_str: str = re.sub(
-				r"\\\{" + rf"({detected_level_key})" +r"\\\}", r"(.*?)", re.escape(dummy_level.properties.marker_pattern)
-			) # Turn the {detected_level_key} into a regex capture group
-			detected_level_key_index_str_match = re.match(regex_level_key_index_str, implied_index_str)
+			print()
+			# Extract the level key contents inside the detected index string			
+			detected_level_key_index_str_match = re.match(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
+			# print(implied_index_str, detected_level_key, "using regex", dummy_enumeration.detection_regexes[detected_level_key])
 			if detected_level_key_index_str_match is not None:
 				return detected_level_key_index_str_match.group(1)
 			else:
@@ -567,15 +566,10 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				)
 				if implied_index_matches is not None:
 					implied_index_matches_table[effective_block.id] = implied_index_matches
-		
-		for effective_block in self.effective_document.values():
-			if effective_block.id in implied_index_matches_table.keys():
-				implied_index_matches = implied_index_matches_table[effective_block.id]
-				print(f"{effective_block.id=} => {implied_index_matches[0].index_str} [{len(implied_index_matches)}]")
-				for iim in implied_index_matches:
-					print("\t - ", iim.level.id, iim.level.properties.marker_pattern, iim.level.properties.marker_type, iim.index_str, iim.index_ctr)
+					print(f"{effective_block.id=} => {implied_index_matches[0].index_str} [{len(implied_index_matches)}]")
+					for iim in implied_index_matches:
+						print("\t - ", iim.level.id, iim.level.properties.marker_pattern, iim.level.properties.marker_type, "=>", iim.index_str, iim.index_ctr)
 					
-
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		
