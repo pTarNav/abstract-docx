@@ -450,17 +450,16 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			# ! TODO: Maybe its stupid to have to check the level key all the time like this
 			detected_level_key: int = next(level_key for level_key, level in dummy_enumeration.levels.items() if dummy_level.id == level.id)
 
-			print()
 			# Extract the level key contents inside the detected index string			
 			detected_level_key_index_str_match = re.match(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
-			# print(implied_index_str, detected_level_key, "using regex", dummy_enumeration.detection_regexes[detected_level_key])
+
 			if detected_level_key_index_str_match is not None:
 				return detected_level_key_index_str_match.group(1)
 			else:
 				raise ValueError("") # TODO
 
 
-	def _implied_index_detection(self, effective_paragraph: Paragraph) -> Optional[list[ImpliedIndex]]:
+	def _implied_index_detection(self, effective_paragraph: Paragraph) -> Optional[dict[str, ImpliedIndex]]:
 		"""
 
 		:param effective_paragraph_content: _description_
@@ -535,7 +534,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		distinct_marker_types: list[MarkerType] = list(set([level.properties.marker_type for level in matched_levels]))
 		implied_index_matches_effective_levels: list[Level] = [
 			Level(
-				id=f"dummy-{marker_type}", # TODO: find some better naming mechanism
+				id=f"__@IMPLIED_INDEX_LEVEL={marker_type.value}__", # TODO: find some better naming mechanism
 				properties=LevelProperties(marker_type=marker_type),
 				style=effective_paragraph.content[0].style
 			)
@@ -549,27 +548,88 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			implied_index_str=index_str, matched_enumerations=matched_enumerations, matched_levels=matched_levels
 		)
 
-		return [
-			ImpliedIndex(level=level, index_str=index_str, index_ctr=level.properties.marker_type.counter(s=level_key_index_str))
+		return {
+			level.id: ImpliedIndex(level=level, index_str=index_str, index_ctr=level.properties.marker_type.counter(s=level_key_index_str))
 			for level in implied_index_matches_effective_levels
-		]
+		}
 
-	def _compute_effective_block_implied_indexes(self) -> None:
-		implied_index_matches_table: dict[int, list[ImpliedIndex]] = {}
-		
+	def _compute_effective_block_implied_indexes(self) -> None:		
+		effective_paragraphs_implied_index_matches_map: dict[int, dict[str, ImpliedIndex]] = {}
+
+		# First pass to collect all the implied index matches
 		for effective_block in self.effective_document.values():
-			if isinstance(effective_block, Paragraph) and len(effective_block.content) > 0 and effective_block.format.index is None: # TODO: investigate why so many clauses
-				# Do not try to find implied index matches for other block types.
-				# Because with tables, it is much more difficult for a user to set the numbering manually			
-				implied_index_matches: Optional[list[ImpliedIndex]] = self._implied_index_detection(
-					effective_paragraph=effective_block
-				)
-				if implied_index_matches is not None:
-					implied_index_matches_table[effective_block.id] = implied_index_matches
-					print(f"{effective_block.id=} => {implied_index_matches[0].index_str} [{len(implied_index_matches)}]")
-					for iim in implied_index_matches:
-						print("\t - ", iim.level.id, iim.level.properties.marker_pattern, iim.level.properties.marker_type, "=>", iim.index_str, iim.index_ctr)
-					
+			if isinstance(effective_block, Paragraph) and len(effective_block.content) > 0 and effective_block.format.index is None:
+				# Do not try to find implied index matches for other block types 
+				# (because it is much more difficult for a user to set the numbering manually)
+				implied_index_matches: Optional[dict[str, ImpliedIndex]] = self._implied_index_detection(effective_paragraph=effective_block)
+				if implied_index_matches is not None:			
+					effective_paragraphs_implied_index_matches_map[effective_block.id] = implied_index_matches
+		
+		# Decide on the implied indexes trying to maximize index counter continuity
+		# All of this is under the assumption of index counter continuity
+		# (Honestly, if that is not the case the problem is not my code but your document structure :P)
+		# But, if anyone has a better a idea, please tell me I will gladly listen...
+
+		implied_index_levels_prev_boundary: dict[str, int] = {} # Can be updated as decisions take place
+		# ! TODO: What about previously seen actual index prev boundary !? (for next boundary doesnt need to be taken into account)
+		for i, effective_paragraph_id in enumerate(effective_paragraphs_implied_index_matches_map.keys()):
+			if i == 50: break
+			implied_index_matches: dict[str, ImpliedIndex] = effective_paragraphs_implied_index_matches_map[effective_paragraph_id]
+
+			# Compute implied index levels next boundaries
+			# TODO: I'm sure this can be optimized so it doesnt need to do the full loop each time, but for now to simplify things (and it isnt even needed outisde the case of implied_index_matches > 1)
+			implied_index_levels_next_boundary: dict[str, Optional[int]] = {}
+			for j in range(i+1, len(effective_paragraphs_implied_index_matches_map)):
+				future_implied_index_matches: dict[str, ImpliedIndex] = list(effective_paragraphs_implied_index_matches_map.values())[j]  # TODO: maybe take this out of the two loops so it doesnt need to be converted to list every time?
+
+				for future_implied_index_level_id, future_implied_index_match in future_implied_index_matches.items():
+					if (
+						future_implied_index_level_id in implied_index_matches.keys() # Do not consider it if not needed
+						and future_implied_index_level_id not in implied_index_levels_next_boundary.keys() # Only consider it if it is the first appearance
+					):
+						implied_index_levels_next_boundary[future_implied_index_level_id] = future_implied_index_match.index_ctr
+
+				if all([implied_index_level_next_boundary is not None for implied_index_level_next_boundary in implied_index_levels_next_boundary.values()]):
+					# All needed implied index level next boundaries have been found
+					break
+
+			print("@@@@@@@@@@@@@@@@@@@@@@@@@")
+
+			print(f"{effective_paragraph_id=} => {list(implied_index_matches.values())[0].index_str} [{len(implied_index_matches)}]")
+			for iim in implied_index_matches.values():
+				print("\t - ", iim.level.id, iim.level.properties.marker_type, "=>", iim.index_str, iim.index_ctr)
+
+			print("-------------------------")
+			effective_paragraph: Paragraph = self.effective_document[effective_paragraph_id]
+
+			if len(implied_index_matches) == 1:
+				# If only one implied index match, associate it to the effective paragraph
+				print("## Only one implied index match")
+				effective_paragraph.format.implied_index = next(iter(implied_index_matches.values()))
+			else:
+				# TODO: document this well it is a complex algorithm
+				print("## More than one implied index match")
+				print("Prev boundary", implied_index_levels_prev_boundary)
+				print("Next boundary", implied_index_levels_next_boundary)
+
+				for implied_index_level_id, implied_index_match in implied_index_matches.items():
+					prev_continuity_diff: int = implied_index_levels_prev_boundary.get(implied_index_level_id, 0) + 1 - implied_index_match.index_ctr
+					prev_continuity: bool = prev_continuity_diff == 0
+					next_continuity_diff: int = implied_index_match.index_ctr - (implied_index_levels_next_boundary.get(implied_index_level_id, len(self.effective_document)) - 1)
+					next_continuity: bool = next_continuity_diff == 0
+					print(implied_index_level_id, "prev continuity diff", prev_continuity_diff, "next continuity diff", next_continuity_diff)
+				
+				# Only on of the previous boundary is continuous
+				# TODO
+				pass
+				effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # for now to test it
+			
+			# Update implied index levels previous boundaries based on the decision
+			implied_index_levels_prev_boundary[effective_paragraph.format.implied_index.level.id] = effective_paragraph.format.implied_index.index_ctr			
+			print("=>", effective_paragraph.format.implied_index.level.id)
+			print("-------------------------")
+			print()
+
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		

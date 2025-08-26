@@ -4,7 +4,7 @@ from typing import Optional
 from utils.pydantic import ArbitraryBaseModel
 
 from abstract_docx.data_models.styles import Style
-from abstract_docx.data_models.numberings import Index
+from abstract_docx.data_models.numberings import Index, ImpliedIndex
 
 import ooxml_docx.document.run as OOXML_RUN
 
@@ -12,6 +12,7 @@ import ooxml_docx.document.run as OOXML_RUN
 class Format(ArbitraryBaseModel):
 	style: Style
 	index: Optional[Index] = None
+	implied_index: Optional[ImpliedIndex] = None
 
 
 class Block(ArbitraryBaseModel):
