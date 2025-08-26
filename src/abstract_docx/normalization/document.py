@@ -571,13 +571,12 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# But, if anyone has a better a idea, please tell me I will gladly listen...
 
 		implied_index_levels_prev_boundary: dict[str, int] = {} # Can be updated as decisions take place
-		# ! TODO: What about previously seen actual index prev boundary !? (for next boundary doesnt need to be taken into account)
+		# ! TODO: What about actual index boundary to update prev and next continuities!? (for next boundary it isnt mandatory but it would be nice)
 		for i, effective_paragraph_id in enumerate(effective_paragraphs_implied_index_matches_map.keys()):
-			if i == 50: break
 			implied_index_matches: dict[str, ImpliedIndex] = effective_paragraphs_implied_index_matches_map[effective_paragraph_id]
 
 			# Compute implied index levels next boundaries
-			# TODO: I'm sure this can be optimized so it doesnt need to do the full loop each time, but for now to simplify things (and it isnt even needed outisde the case of implied_index_matches > 1)
+			# TODO: I'm sure this can be optimized so it doesnt need to do the full loop each time, but for now to simplify things (and it isnt even needed outside the case of implied_index_matches > 1)
 			implied_index_levels_next_boundary: dict[str, Optional[int]] = {}
 			for j in range(i+1, len(effective_paragraphs_implied_index_matches_map)):
 				future_implied_index_matches: dict[str, ImpliedIndex] = list(effective_paragraphs_implied_index_matches_map.values())[j]  # TODO: maybe take this out of the two loops so it doesnt need to be converted to list every time?
@@ -589,9 +588,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					):
 						implied_index_levels_next_boundary[future_implied_index_level_id] = future_implied_index_match.index_ctr
 
-				if all([implied_index_level_next_boundary is not None for implied_index_level_next_boundary in implied_index_levels_next_boundary.values()]):
-					# All needed implied index level next boundaries have been found
-					break
+				if len(implied_index_levels_next_boundary) == len(implied_index_matches): break # All needed implied index level next boundaries have been found
 
 			print("@@@@@@@@@@@@@@@@@@@@@@@@@")
 
@@ -612,21 +609,74 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				print("Prev boundary", implied_index_levels_prev_boundary)
 				print("Next boundary", implied_index_levels_next_boundary)
 
-				for implied_index_level_id, implied_index_match in implied_index_matches.items():
-					prev_continuity_diff: int = implied_index_levels_prev_boundary.get(implied_index_level_id, 0) + 1 - implied_index_match.index_ctr
-					prev_continuity: bool = prev_continuity_diff == 0
-					next_continuity_diff: int = implied_index_match.index_ctr - (implied_index_levels_next_boundary.get(implied_index_level_id, len(self.effective_document)) - 1)
-					next_continuity: bool = next_continuity_diff == 0
-					print(implied_index_level_id, "prev continuity diff", prev_continuity_diff, "next continuity diff", next_continuity_diff)
+				implied_index_matches_continuity_diff: dict[str, dict[str, int]] = {
+					implied_index_level_id: {
+						"prev": implied_index_levels_prev_boundary.get(implied_index_level_id, 0) + 1 - implied_index_match.index_ctr,
+						"next": implied_index_match.index_ctr - (implied_index_levels_next_boundary.get(implied_index_level_id, len(self.effective_document)) - 1)
+					}
+					for implied_index_level_id, implied_index_match in implied_index_matches.items()
+				}
+				for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items():
+					print(implied_index_level, "prev continuity", implied_index_match_continuity["prev"], "next continuity", implied_index_match_continuity["next"])
 				
-				# Only on of the previous boundary is continuous
-				# TODO
-				pass
-				effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # for now to test it
+				implied_index_matches_with_full_continuity: dict[str, dict[str, int]] = {
+					implied_index_level: implied_index_match_continuity
+					for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items()
+					if implied_index_match_continuity["prev"] == 0 and implied_index_match_continuity["next"] == 0
+				}
+				implied_index_matches_with_partial_prev_continuity: dict[str, dict[str, int]] = {
+					implied_index_level: implied_index_match_continuity
+					for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items()
+					if implied_index_match_continuity["prev"] == 0 and implied_index_match_continuity["next"] != 0
+				}
+				implied_index_matches_with_partial_next_continuity: dict[str, dict[str, int]] = {
+					implied_index_level: implied_index_match_continuity
+					for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items()
+					if implied_index_match_continuity["prev"] != 0 and implied_index_match_continuity["next"] == 0
+				}
+				implied_index_matches_with_no_continuity: dict[str, dict[str, int]] = {
+					implied_index_level: implied_index_match_continuity
+					for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items()
+					if implied_index_match_continuity["prev"] != 0 and implied_index_match_continuity["next"] != 0
+				}
+				print(
+					"full:", len(implied_index_matches_with_full_continuity),
+					"partial_prev:", len(implied_index_matches_with_partial_prev_continuity),
+					"partial_next:", len(implied_index_matches_with_partial_next_continuity),
+					"none:", len(implied_index_matches_with_no_continuity),
+				)
+				
+				match len(implied_index_matches_with_full_continuity):
+					case 0: # No implied index matches with full continuity
+						print("### No implied index match with full continuity")
+						match (len(implied_index_matches_with_partial_prev_continuity), len(implied_index_matches_with_partial_next_continuity)):
+							case (0, 0): # No implied index matches with partial continuity
+								print("#### No implied index match with partial continuity")
+								effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # TODO for now to test it
+
+							case (1, 0): # If only one implied index match with partial previous continuity, associate it to the effective paragraph
+								print("#### Only one implied index match with partial previous continuity")
+								effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_partial_prev_continuity.keys()))]
+
+							case (0, 1): # If only one implied index match with partial next continuity, associate it to the effective paragraph
+								print("#### Only one implied index match with partial next continuity")
+								effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_partial_next_continuity.keys()))]
+
+							case _:
+								print("#### More than one implied index match with partial continuity")
+								effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # TODO for now to test it
+
+					case 1: # If only one implied index match with full continuity, associate it to the effective paragraph
+						print("### Only one implied index match with full continuity")
+						effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_full_continuity.keys()))]
+
+					case _: # More than one implied index match with full continuity
+						print("### More than one implied index match with full continuity")
+						effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_full_continuity.keys()))] # TODO for now to test it
 			
 			# Update implied index levels previous boundaries based on the decision
 			implied_index_levels_prev_boundary[effective_paragraph.format.implied_index.level.id] = effective_paragraph.format.implied_index.index_ctr			
-			print("=>", effective_paragraph.format.implied_index.level.id)
+			print("!!!!!!!! =>", effective_paragraph.format.implied_index.level.id)
 			print("-------------------------")
 			print()
 

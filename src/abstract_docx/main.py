@@ -99,8 +99,8 @@ class AbstractDocx(ArbitraryBaseModel):
 			r, g, b = colorsys.hls_to_rgb(hue, 0.5, 0.5)
 			return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 		
-		if curr_block.format is not None and curr_block.format.index is not None and curr_block.format.index.index_ctr is not None:
-			curr_block_numbering_str: str = curr_block.format.index.enumeration.format(index_ctr=curr_block.format.index.index_ctr)
+		if curr_block.format is not None and curr_block.format.is_numbered:
+			curr_block_numbering_str: str = curr_block.format.index_str
 		else:
 			curr_block_numbering_str: str = ""
 
@@ -114,10 +114,10 @@ class AbstractDocx(ArbitraryBaseModel):
 
 			if include_metadata:
 				curr_tree_node.add(f"Style ID: {curr_block.format.style.id if curr_block.format is not None else '-'}")
-				curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
-				curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				# curr_tree_node.add(f"Numbering ID: {curr_block.format.index.numbering.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				# curr_tree_node.add(f"Enumeration ID: {curr_block.format.index.enumeration.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				# curr_tree_node.add(f"Level ID: {curr_block.format.index.level.id if curr_block.format is not None and curr_block.format.index is not None else '-'}")
+				# curr_tree_node.add(f"Level indexes: {curr_block.format.index.index_ctr if curr_block.format is not None and curr_block.format.index is not None else '-'}")
 		elif isinstance(curr_block, Table):
 			rich_table: RichTable = RichTable(show_header=False, show_lines=True)
 			for _ in range(len(curr_block.rows[0].cells)):
@@ -162,8 +162,8 @@ class AbstractDocx(ArbitraryBaseModel):
 	
 	def _to_text(self, block: Block, depth: int=0) -> str:
 		s = "\t"*depth
-		if block.format.index.index_ctr is not None:
-			s += block.format.index.enumeration.format(index_ctr=block.format.index.index_ctr)
+		if block.format.is_numbered:
+			s += block.format.index_str
 		if isinstance(block, Paragraph):
 			s += str(block)
 		elif isinstance(block, Table):

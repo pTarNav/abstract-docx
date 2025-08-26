@@ -544,6 +544,7 @@ class NumberingsView(ArbitraryBaseModel):
 		if curr_index is None or prev_index is None or curr_index.numbering.id != prev_index.numbering.id:
 			return 0
 		
+		# Shared enumeration
 		if curr_index.enumeration.id == prev_index.enumeration.id:
 			if curr_index.level.id == prev_index.level.id:
 				return 0
