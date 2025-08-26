@@ -29,6 +29,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml
 
 	_computed_numberings_index_ctr: dict[int, dict[int, Optional[int]]] = {}
+	_effective_paragraphs_implied_index_matches_map: dict[int, dict[str, ImpliedIndex]] = {}
 
 	# Parameters
 	# TODO: parameterize in the input of normalization()
@@ -301,8 +302,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					break
 			
 			if not found_effective_style_match:
-				effective_block_style_id: str = effective_block.format.style.id
-				self.effective_styles_from_ooxml.effective_styles[effective_block_style_id] = effective_block.format.style
+				self.effective_styles_from_ooxml.effective_styles[effective_block.format.style.id] = effective_block.format.style
 			
 			if isinstance(effective_block, Paragraph):
 				self._associate_effective_text_styles(effective_texts=effective_block.content)
@@ -532,11 +532,12 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		# All other level properties can be ignored because they will not be used in the hierarchization step.
 
 		distinct_marker_types: list[MarkerType] = list(set([level.properties.marker_type for level in matched_levels]))
+		implied_index_matches_effective_levels_style: Style = effective_paragraph.content[0].style # Style of the first run
 		implied_index_matches_effective_levels: list[Level] = [
 			Level(
-				id=f"__@IMPLIED_INDEX_LEVEL={marker_type.value}__", # TODO: find some better naming mechanism
+				id=f"__@IMPLIED_INDEX_LEVEL={marker_type.value}@STYLE={implied_index_matches_effective_levels_style.id}__",
 				properties=LevelProperties(marker_type=marker_type),
-				style=effective_paragraph.content[0].style
+				style=implied_index_matches_effective_levels_style
 			)
 			for marker_type in distinct_marker_types
 		]
@@ -553,9 +554,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			for level in implied_index_matches_effective_levels
 		}
 
-	def _compute_effective_block_implied_indexes(self) -> None:		
-		effective_paragraphs_implied_index_matches_map: dict[int, dict[str, ImpliedIndex]] = {}
-
+	def _compute_effective_paragraph_implied_indexes(self) -> None:		
 		# First pass to collect all the implied index matches
 		for effective_block in self.effective_document.values():
 			if isinstance(effective_block, Paragraph) and len(effective_block.content) > 0 and effective_block.format.index is None:
@@ -563,23 +562,26 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				# (because it is much more difficult for a user to set the numbering manually)
 				implied_index_matches: Optional[dict[str, ImpliedIndex]] = self._implied_index_detection(effective_paragraph=effective_block)
 				if implied_index_matches is not None:			
-					effective_paragraphs_implied_index_matches_map[effective_block.id] = implied_index_matches
-		
-		# Decide on the implied indexes trying to maximize index counter continuity
-		# All of this is under the assumption of index counter continuity
-		# (Honestly, if that is not the case the problem is not my code but your document structure :P)
-		# But, if anyone has a better a idea, please tell me I will gladly listen...
+					self._effective_paragraphs_implied_index_matches_map[effective_block.id] = implied_index_matches
+	
+	def _resolve_implied_indexes(self) -> None:
+		"""
+		Decide on the implied indexes trying to maximize index counter continuity.
+		All of this is under the assumption of index counter continuity.
+		(Honestly, if that is not the case the problem is not my code but your document structure :P)
+		But, if anyone has a better a idea, please tell me I will gladly listen...
+		"""
 
 		implied_index_levels_prev_boundary: dict[str, int] = {} # Can be updated as decisions take place
 		# ! TODO: What about actual index boundary to update prev and next continuities!? (for next boundary it isnt mandatory but it would be nice)
-		for i, effective_paragraph_id in enumerate(effective_paragraphs_implied_index_matches_map.keys()):
-			implied_index_matches: dict[str, ImpliedIndex] = effective_paragraphs_implied_index_matches_map[effective_paragraph_id]
-
+		for i, effective_paragraph_id in enumerate(self._effective_paragraphs_implied_index_matches_map.keys()):
+			implied_index_matches: dict[str, ImpliedIndex] = self._effective_paragraphs_implied_index_matches_map[effective_paragraph_id]
+			
 			# Compute implied index levels next boundaries
 			# TODO: I'm sure this can be optimized so it doesnt need to do the full loop each time, but for now to simplify things (and it isnt even needed outside the case of implied_index_matches > 1)
 			implied_index_levels_next_boundary: dict[str, Optional[int]] = {}
-			for j in range(i+1, len(effective_paragraphs_implied_index_matches_map)):
-				future_implied_index_matches: dict[str, ImpliedIndex] = list(effective_paragraphs_implied_index_matches_map.values())[j]  # TODO: maybe take this out of the two loops so it doesnt need to be converted to list every time?
+			for j in range(i+1, len(self._effective_paragraphs_implied_index_matches_map)):
+				future_implied_index_matches: dict[str, ImpliedIndex] = list(self._effective_paragraphs_implied_index_matches_map.values())[j]  # TODO: maybe take this out of the two loops so it doesnt need to be converted to list every time?
 
 				for future_implied_index_level_id, future_implied_index_match in future_implied_index_matches.items():
 					if (
@@ -680,6 +682,19 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			print("-------------------------")
 			print()
 
+	def _associate_implied_index_levels(self) -> None:
+		for effective_block in self.effective_document.values():
+			if isinstance(effective_block, Paragraph) and effective_block.format.implied_index is not None:	
+				found_effective_level_match: bool = False
+				for effective_level in self.effective_numberings_from_ooxml.effective_levels.values():
+					if effective_block.format.implied_index.level == effective_level:
+						effective_block.format.implied_index.level = effective_level
+						found_effective_level_match = True
+						break
+				
+				if not found_effective_level_match:
+					self.effective_numberings_from_ooxml.effective_levels[effective_block.format.implied_index.level.id] = effective_block.format.implied_index.level		
+
 	def load(self) -> None:
 		self._compute_effective_blocks()
 		
@@ -688,6 +703,8 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		self._associate_effective_block_indexes()
 		self._resolve_indexes()
 		
-		self._compute_effective_block_implied_indexes()
+		self._compute_effective_paragraph_implied_indexes()
+		self._resolve_implied_indexes()
+		self._associate_implied_index_levels()
 
 		
