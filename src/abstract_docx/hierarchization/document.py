@@ -129,16 +129,7 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 					and styles_priority_difference == -numberings_priority_difference
 				):
 					raise ValueError("") # TODO
-				total_priority_difference = numberings_priority_difference
-				if prev_block.id in [172]:
-					for k, v in self.numberings_view.priorities.items():
-						print(k, [l.id for l in v])
-					print(prev_block.id, curr_block.id, indexes_present, shared_numbering)
-					print(total_priority_difference, styles_priority_difference, numberings_priority_difference)
-					print(prev_block.format.implied_index, curr_block.format.implied_index)
-					print(self.numberings_view._find_priority(level=prev_block.format.implied_index.level))
-					print(self.numberings_view._find_priority(level=curr_block.format.implied_index.level))
-				
+				total_priority_difference = numberings_priority_difference				
 			else:
 				total_priority_difference = styles_priority_difference
 
