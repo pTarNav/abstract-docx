@@ -385,6 +385,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			for group_id, grouped_enumeration in groups.items():
 				if enumeration == grouped_enumeration:
 					duplicated_in_group = group_id
+					break
 			
 			if duplicated_in_group is not None:
 				new_group_id = f"{duplicated_in_group}&{enumeration.id}" # TODO: what happens if for some reason there already exists a enumeration with this id?

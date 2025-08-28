@@ -58,7 +58,7 @@ class MarkerPattern(str):
 		return super().format(*complete_ordered_level_strings)
 
 
-def to_letters(n: int) -> str:
+def _to_letters(n: int) -> str:
 	"""Convert a 1-based index to letters (A, B, ..., Z, AA, AB, ...)."""
 	result = ""
 	while n > 0:
@@ -128,15 +128,15 @@ class MarkerType(Enum):
 				except ValueError:
 					return str(index)
 			case MarkerType.DECIMAL_ORDINAL:
-				return num2words(index, to="ordinal_num")
+				return num2words(index, to="ordinal_num") # TODO: other language support
 			case MarkerType.CARDINAL:
 				return num2words(index, to="cardinal")
 			case MarkerType.ORDINAL:
 				return num2words(index, to="ordinal")
 			case MarkerType.LOWER_LETTER:
-				return to_letters(index).lower()
+				return _to_letters(index).lower()
 			case MarkerType.UPPER_LETTER:
-				return to_letters(index).upper()
+				return _to_letters(index).upper()
 			case MarkerType.LOWER_ROMAN:
 				return roman.toRoman(index).lower()
 			case MarkerType.UPPER_ROMAN:
@@ -187,6 +187,34 @@ class MarkerType(Enum):
 			case MarkerType.UPPER_ROMAN:
 				return r"[IVXLCDM]+"
 
+	def counter(self, s: str) -> int:
+		"""Parse a marker string and return its integer counter value (1-based)."""
+		match self:
+			case MarkerType.NONE:
+				return 0
+			case MarkerType.BULLET:
+				return 0
+			case MarkerType.DECIMAL | MarkerType.DECIMAL_LEADING_ZERO:
+				return int(s)
+			case MarkerType.DECIMAL_ENCLOSED_CIRCLE:
+				# Unicode circled numbers start at ① (U+2460) for 1
+				code_point = ord(s)
+				if 0x2460 <= code_point <= 0x2473:
+					return code_point - 0x2460 + 1
+				raise ValueError(f"Invalid circled decimal: {s}")
+			case MarkerType.DECIMAL_ORDINAL:
+				return int(re.match(r"(\d+)", s).group(1))
+			case MarkerType.CARDINAL:
+				raise NotImplementedError("Sorry will work on it") # TODO:
+			case MarkerType.ORDINAL:
+				raise NotImplementedError("Sorry will work on it") # TODO:
+			case MarkerType.LOWER_LETTER | MarkerType.UPPER_LETTER:
+				return sum((ord(c) - 96)*(26**i) for i, c in enumerate(reversed(s.lower())))
+			case MarkerType.LOWER_ROMAN | MarkerType.UPPER_ROMAN:
+				return roman.fromRoman(s)
+			case _:
+				raise NotImplementedError(f"No '.counter()' implementation for {self}")
+		
 
 class Whitespace(Enum):
 	NONE = "none"
@@ -211,11 +239,11 @@ class Whitespace(Enum):
 	def format(self) -> str:
 		match self:
 			case Whitespace.NONE:
-				return r""
+				return ""
 			case Whitespace.SPACE:
-				return r" "
+				return " "
 			case Whitespace.TAB:
-				return r"\t"
+				return "\t"
 
 	def detection_regex(self) -> str:
 		match self:
@@ -262,6 +290,7 @@ class Restart(int):
 			return cls.default()
 		
 		return cls(int(v))
+
 
 class OverrideStart(int):
 	"""
@@ -379,18 +408,18 @@ class Enumeration(ArbitraryBaseModel):
 		
 		raise ValueError("") # TODO
 
-	def format(self, level_indexes: dict[int, int]) -> str:
-		if not all([lk in self.levels.keys() for lk in level_indexes.keys()]):
-			raise KeyError("Level indexes could not be mapped to levels.")
+	def format(self, index_ctr: Optional[dict[int, int]]) -> str:
+		# TODO: raise error if index_ctr is None
+		if not all([lk in self.levels.keys() for lk in index_ctr.keys()]):
+			raise KeyError("Index counters could not be mapped to levels.")
 		
 		level_strings: dict[int, str] = {}
-		for k, v in level_indexes.items():
+		for k, v in index_ctr.items():
 			level_strings[k] = self.levels[k].properties.marker_type.format(index=v)
 		
-		marker_pattern: str = self.levels[max(level_indexes.keys())].properties.marker_pattern.format(levels_strings=level_strings)
-		whitespace: str = self.levels[max(level_indexes.keys())].properties.whitespace.format()
+		marker_pattern: str = self.levels[max(index_ctr.keys())].properties.marker_pattern.format(levels_strings=level_strings)
+		whitespace: str = self.levels[max(index_ctr.keys())].properties.whitespace.format()
 		return f"{marker_pattern}{whitespace}"
-			
 	
 	@cached_property
 	def detection_regexes(self) -> dict[int, Optional[re.Pattern]]:
@@ -408,7 +437,10 @@ class Enumeration(ArbitraryBaseModel):
 					_marker_templated_escaped = marker_template_escaped
 					for _k in range(0, k+1):
 						if level_indexes_regexes[_k] is not None:
-							marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"(?:{level_indexes_regexes[_k]})")	
+							if _k == k: # Make capturing group for the level key
+								marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"({level_indexes_regexes[_k]})")
+							else:
+								marker_template_escaped = marker_template_escaped.replace(r"\{" + str(_k) + r"\}", f"(?:{level_indexes_regexes[_k]})")
 
 					if marker_template_escaped != _marker_templated_escaped:
 						level_regexes[k] = rf"^{marker_template_escaped}{v.properties.whitespace.detection_regex()}"
@@ -433,7 +465,7 @@ class Enumeration(ArbitraryBaseModel):
 				match = re.match(self.detection_regexes[level_id], run.text)
 				if match is not None:
 					# Only take run style properties into account,
-					#  since using paragraph style properties too can lead to false negatives
+					# since using paragraph style properties too can lead to false negatives
 					if level.style.properties.run_style_properties == run.style.properties.run_style_properties:
 						matches["regex_and_style"].append(level)
 					else:
@@ -453,6 +485,20 @@ class Index(ArbitraryBaseModel):
 	enumeration: Enumeration
 	level: Level
 
+	_index_str: Optional[str] = None
+	index_ctr: Optional[dict[int, int]] = None
+
+	@property
+	def index_str(self):
+		if self._index_str is None:
+			self._index_str = self.enumeration.format(index_ctr=self.index_ctr)
+		
+		return self._index_str
+
+class ImpliedIndex(ArbitraryBaseModel):
+	level: Level
+	index_ctr: int
+	index_str: str
 
 class NumberingsView(ArbitraryBaseModel):
 	numberings: dict[int, Numbering]
@@ -493,31 +539,41 @@ class NumberingsView(ArbitraryBaseModel):
 				return priority
 		
 		raise KeyError("") # TODO
+	
 
-	def priority_difference(self, curr_index: Optional[Index], prev_index: Optional[Index]) -> int:
-		if curr_index is None or prev_index is None or curr_index.numbering.id != prev_index.numbering.id:
-			return 0
+	def priority_difference(
+		self, curr_index: Optional[Index | ImpliedIndex], prev_index: Optional[Index | ImpliedIndex]
+	) -> int:
+		# Do not compare unless they are both indexes or implied indexes
+		if curr_index is None or prev_index is None or type(curr_index) is not type(prev_index): return 0
 		
-		if curr_index.enumeration.id == prev_index.enumeration.id:
-			if curr_index.level.id == prev_index.level.id:
+		if isinstance(curr_index, Index):
+			# Numbering priority difference
+			if curr_index.numbering.id != prev_index.numbering.id:
 				return 0
 			
-			curr_level_key: int = -1
-			prev_level_key: int = -1
-			for level_key, level in curr_index.enumeration.levels.items():
-				if curr_index.level.id == level.id:
-					curr_level_key = level_key
-				if prev_index.level.id == level.id:
-					prev_level_key = level_key
+			# Enumeration priority difference
+			if curr_index.enumeration.id == prev_index.enumeration.id:
+				if curr_index.level.id == prev_index.level.id:
+					return 0
 				
-				if curr_level_key != -1 and prev_level_key != -1:
-					if curr_level_key < prev_level_key:
-						return 1
-					elif curr_level_key > prev_level_key:
-						return -1
-			
-			raise ValueError("")
-		
+				curr_level_key: int = -1
+				prev_level_key: int = -1
+				for level_key, level in curr_index.enumeration.levels.items():
+					if curr_index.level.id == level.id:
+						curr_level_key = level_key
+					if prev_index.level.id == level.id:
+						prev_level_key = level_key
+					
+					if curr_level_key != -1 and prev_level_key != -1:
+						if curr_level_key < prev_level_key:
+							return 1
+						elif curr_level_key > prev_level_key:
+							return -1
+				
+				raise ValueError("")
+
+		# Level priority difference
 		match self._find_priority(level=curr_index.level) - self._find_priority(level=prev_index.level):
 			case 0:
 				return 0
@@ -525,3 +581,6 @@ class NumberingsView(ArbitraryBaseModel):
 				return 1
 			case diff_priority if diff_priority > 0:
 				return -1
+
+	
+

@@ -10,7 +10,7 @@ def _test_output_tree_structure_and_numbering_at_block_level(block: Block, test_
 	
 	# Check numbering matches
 	block_numbering_str: str | None = (	
-		block.format.index.enumeration.format(level_indexes=block.level_indexes)
+		block.format.index.enumeration.format(index_ctr=block.format.index.index_ctr)
 		if block.format is not None and block.format.index is not None
 		else None
 	)

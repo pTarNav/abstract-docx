@@ -50,8 +50,8 @@ DEFAULT_NUMBERINGS_PRIORITY_PARAMETERS: NumberingsPriorityParameters = Numbering
 		AvailableNumberingsPriorityParameters.UPPER_ROMAN,
 		AvailableNumberingsPriorityParameters.UPPER_LETTER,
 		AvailableNumberingsPriorityParameters.DECIMAL,
-		AvailableNumberingsPriorityParameters.LOWER_ROMAN,
 		AvailableNumberingsPriorityParameters.LOWER_LETTER,
+		AvailableNumberingsPriorityParameters.LOWER_ROMAN,
 		AvailableNumberingsPriorityParameters.BULLET,
 		AvailableNumberingsPriorityParameters.NONE
 	]
@@ -105,6 +105,7 @@ class HierarchicalNumberingsFromOoxml(ArbitraryBaseModel):
 		Returns 1 if level has higher priority than the level priority representative
 		"""
 
+		# TODO: If two levels are from the same enumeration, the priority difference should be given by their position in the enumeration
 		for priority in self.numberings_priority_parameters:
 			priority: MarkerType = MarkerType(priority.value)
 			
