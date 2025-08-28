@@ -82,12 +82,18 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 		total_priority_difference: int = -1
 		if prev_block.id != -1:
 			indexes_present: bool = (
-				not prev_block.id == -1
-				and curr_block.format.index is not None 
-				and prev_block.format.index is not None 
+				(curr_block.format.index is not None or curr_block.format.implied_index is not None)
+				and (prev_block.format.index is not None or prev_block.format.implied_index is not None)
 			)
 			shared_numbering: bool = (
-				indexes_present and curr_block.format.index.numbering == prev_block.format.index.numbering
+				indexes_present 
+				and (
+					curr_block.format.index is None or prev_block.format.index is None
+					or (
+						curr_block.format.index is not None and prev_block.format.index is not None
+						and curr_block.format.index.numbering == prev_block.format.index.numbering
+					)
+				)
 			)
 
 			styles_priority_difference: int = self.styles_view.priority_difference(
@@ -95,14 +101,28 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 			)
 			if indexes_present and styles_priority_difference == 0:
 				styles_priority_difference = self.styles_view.priority_difference(
-					curr_style=curr_block.format.index.level.style, prev_style=prev_block.format.index.level.style
+					curr_style=(
+						curr_block.format.index.level.style if curr_block.format.index is not None
+						else curr_block.format.implied_index.level.style
+					),
+					prev_style=(
+						prev_block.format.index.level.style if prev_block.format.index is not None
+						else prev_block.format.implied_index.level.style
+					)
 				)
-			
-			numberings_priority_difference: int = self.numberings_view.priority_difference(
-				curr_index=curr_block.format.index, prev_index=prev_block.format.index
-			)
 
 			if shared_numbering:
+				numberings_priority_difference: int = self.numberings_view.priority_difference(
+					curr_index=(
+						curr_block.format.index if curr_block.format.index is not None
+						else curr_block.format.implied_index
+					),
+					prev_index=(
+						prev_block.format.index if prev_block.format.index is not None
+						else prev_block.format.implied_index
+					)
+				)
+				
 				if (
 					self.hierarchization_conflict_resolution == HierarchizationConflictResolution.BOUNDED
 					and styles_priority_difference != 0 and numberings_priority_difference != 0
@@ -110,9 +130,18 @@ class HierarchicalDocumentFromOoxml(ArbitraryBaseModel):
 				):
 					raise ValueError("") # TODO
 				total_priority_difference = numberings_priority_difference
+				if prev_block.id in [172]:
+					for k, v in self.numberings_view.priorities.items():
+						print(k, [l.id for l in v])
+					print(prev_block.id, curr_block.id, indexes_present, shared_numbering)
+					print(total_priority_difference, styles_priority_difference, numberings_priority_difference)
+					print(prev_block.format.implied_index, curr_block.format.implied_index)
+					print(self.numberings_view._find_priority(level=prev_block.format.implied_index.level))
+					print(self.numberings_view._find_priority(level=curr_block.format.implied_index.level))
+				
 			else:
 				total_priority_difference = styles_priority_difference
-		
+
 		match total_priority_difference:
 			case 0:
 				# Shared parent

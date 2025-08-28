@@ -86,6 +86,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		self._hierarchical_structure: HierarchicalStructureFromOoxml = HierarchicalStructureFromOoxml.hierarchization(
 			effective_structure_from_ooxml=self._effective_structure
 		)
+		
 		self._views: Views = Views.load(
 			effective_structure=self._effective_structure, hierarchical_structure=self._hierarchical_structure
 		)		
@@ -100,7 +101,7 @@ class AbstractDocx(ArbitraryBaseModel):
 			return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
 		
 		if curr_block.format is not None and curr_block.format.is_numbered:
-			curr_block_numbering_str: str = curr_block.format.index_str
+			curr_block_numbering_str: str = repr(curr_block.format.index_str)
 		else:
 			curr_block_numbering_str: str = ""
 

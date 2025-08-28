@@ -409,7 +409,7 @@ class Enumeration(ArbitraryBaseModel):
 		raise ValueError("") # TODO
 
 	def format(self, index_ctr: Optional[dict[int, int]]) -> str:
-		# TODO: raise rror if index_ctr is None
+		# TODO: raise error if index_ctr is None
 		if not all([lk in self.levels.keys() for lk in index_ctr.keys()]):
 			raise KeyError("Index counters could not be mapped to levels.")
 		
@@ -539,32 +539,41 @@ class NumberingsView(ArbitraryBaseModel):
 				return priority
 		
 		raise KeyError("") # TODO
+	
 
-	def priority_difference(self, curr_index: Optional[Index], prev_index: Optional[Index]) -> int:
-		if curr_index is None or prev_index is None or curr_index.numbering.id != prev_index.numbering.id:
-			return 0
+	def priority_difference(
+		self, curr_index: Optional[Index | ImpliedIndex], prev_index: Optional[Index | ImpliedIndex]
+	) -> int:
+		# Do not compare unless they are both indexes or implied indexes
+		if curr_index is None or prev_index is None or type(curr_index) is not type(prev_index): return 0
 		
-		# Shared enumeration
-		if curr_index.enumeration.id == prev_index.enumeration.id:
-			if curr_index.level.id == prev_index.level.id:
+		if isinstance(curr_index, Index):
+			# Numbering priority difference
+			if curr_index.numbering.id != prev_index.numbering.id:
 				return 0
 			
-			curr_level_key: int = -1
-			prev_level_key: int = -1
-			for level_key, level in curr_index.enumeration.levels.items():
-				if curr_index.level.id == level.id:
-					curr_level_key = level_key
-				if prev_index.level.id == level.id:
-					prev_level_key = level_key
+			# Enumeration priority difference
+			if curr_index.enumeration.id == prev_index.enumeration.id:
+				if curr_index.level.id == prev_index.level.id:
+					return 0
 				
-				if curr_level_key != -1 and prev_level_key != -1:
-					if curr_level_key < prev_level_key:
-						return 1
-					elif curr_level_key > prev_level_key:
-						return -1
-			
-			raise ValueError("")
-		
+				curr_level_key: int = -1
+				prev_level_key: int = -1
+				for level_key, level in curr_index.enumeration.levels.items():
+					if curr_index.level.id == level.id:
+						curr_level_key = level_key
+					if prev_index.level.id == level.id:
+						prev_level_key = level_key
+					
+					if curr_level_key != -1 and prev_level_key != -1:
+						if curr_level_key < prev_level_key:
+							return 1
+						elif curr_level_key > prev_level_key:
+							return -1
+				
+				raise ValueError("")
+
+		# Level priority difference
 		match self._find_priority(level=curr_index.level) - self._find_priority(level=prev_index.level):
 			case 0:
 				return 0
@@ -572,3 +581,6 @@ class NumberingsView(ArbitraryBaseModel):
 				return 1
 			case diff_priority if diff_priority > 0:
 				return -1
+
+	
+

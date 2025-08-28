@@ -50,8 +50,8 @@ DEFAULT_NUMBERINGS_PRIORITY_PARAMETERS: NumberingsPriorityParameters = Numbering
 		AvailableNumberingsPriorityParameters.UPPER_ROMAN,
 		AvailableNumberingsPriorityParameters.UPPER_LETTER,
 		AvailableNumberingsPriorityParameters.DECIMAL,
-		AvailableNumberingsPriorityParameters.LOWER_ROMAN,
 		AvailableNumberingsPriorityParameters.LOWER_LETTER,
+		AvailableNumberingsPriorityParameters.LOWER_ROMAN,
 		AvailableNumberingsPriorityParameters.BULLET,
 		AvailableNumberingsPriorityParameters.NONE
 	]
