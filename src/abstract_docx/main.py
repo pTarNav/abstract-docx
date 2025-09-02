@@ -19,7 +19,7 @@ from rich.console import Group as RichGroup
 import colorsys
 from utils.printing import rich_tree_to_str
 
-import pickle
+import dill as pickle
 
 import logging
 from colorlog import ColoredFormatter
@@ -217,6 +217,24 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		with open(f"{self.file_path}.json", "w+", encoding="utf-8") as f:
 			f.write(json_data)
-	
+
 	def to_pickle(self) -> bytes:
+		import copyreg
+		from lxml import etree
+
+		def _pickle_etree_element(elem: etree._Element):
+			# round-trip via bytes
+			return (etree.fromstring, (etree.tostring(elem),))
+
+		def _pickle_etree_tree(tree: etree._ElementTree):
+			root = tree.getroot()
+			return (etree.ElementTree, (etree.fromstring(etree.tostring(root)),))
+
+		copyreg.pickle(etree._Element, _pickle_etree_element)
+		copyreg.pickle(etree._ElementTree, _pickle_etree_tree)
+
 		return pickle.dumps(self)
+	
+	@classmethod
+	def from_pickle(cls, b: bytes) -> AbstractDocx:
+		return pickle.loads(b)
