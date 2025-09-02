@@ -19,6 +19,8 @@ from rich.console import Group as RichGroup
 import colorsys
 from utils.printing import rich_tree_to_str
 
+import pickle
+
 import logging
 from colorlog import ColoredFormatter
 logger = logging.getLogger(__name__)
@@ -215,3 +217,6 @@ class AbstractDocx(ArbitraryBaseModel):
 
 		with open(f"{self.file_path}.json", "w+", encoding="utf-8") as f:
 			f.write(json_data)
+	
+	def to_pickle(self) -> bytes:
+		return pickle.dumps(self)
