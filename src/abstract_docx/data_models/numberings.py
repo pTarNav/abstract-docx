@@ -500,6 +500,16 @@ class ImpliedIndex(ArbitraryBaseModel):
 	index_ctr: int
 	index_str: str
 
+	@property
+	def index_ctr(self) -> Optional[str]:
+		if self.index is not None: return self.index.index_ctr
+		if self.implied_index is not None: return self.implied_index.index_ctr
+		return None
+
+	@property
+	def is_numbered(self) -> bool:
+		return self.index_ctr is not None
+
 class NumberingsView(ArbitraryBaseModel):
 	numberings: dict[int, Numbering]
 	enumerations: dict[str, Enumeration]

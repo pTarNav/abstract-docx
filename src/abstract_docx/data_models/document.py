@@ -15,15 +15,14 @@ class Format(ArbitraryBaseModel):
 	implied_index: Optional[ImpliedIndex] = None
 
 	@property
-	def is_numbered(self) -> bool:
-		return self.index is not None or self.implied_index is not None
-
-	@property
-	def index_str(self) -> str:
+	def index_str(self) -> Optional[str]:
 		if self.index is not None: return self.index.index_str
 		if self.implied_index is not None: return self.implied_index.index_str
+		return None
 
-		raise ValueError("") # TODO
+	@property
+	def is_numbered(self) -> bool:
+		return self.index_str is not None
 
 
 class Block(ArbitraryBaseModel):
