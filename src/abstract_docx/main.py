@@ -170,7 +170,7 @@ class AbstractDocx(ArbitraryBaseModel):
 		if block.format.is_numbered:
 			s += block.format.index_str
 		if isinstance(block, Paragraph):
-			s += str(block)
+			s += str(block).strip()
 		elif isinstance(block, Table):
 			s += ("\n" + "\t"*depth).join([l for l in str(block).split("@NEWLINE@")])
 		else:
