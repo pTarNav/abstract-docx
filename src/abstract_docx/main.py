@@ -51,12 +51,14 @@ class AbstractDocx(ArbitraryBaseModel):
 			handler.setFormatter(formatter)
 
 	@classmethod
-	def read(cls, file_path: str, logging_level: str = "DEBUG") -> AbstractDocx:
+	def read(cls, file_path: str, logging_level: str = "DEBUG", *args, **kwargs) -> AbstractDocx:
 		cls._setup_logger(logging_level=logging_level)
 
 		ooxml_docx: OoxmlDocx = OoxmlDocx.read(file_path=file_path)
+		abstract_docx: AbstractDocx = cls(file_path=file_path, ooxml_docx=ooxml_docx)
+		abstract_docx._construct(*args, **kwargs)
 
-		return cls(file_path=file_path, ooxml_docx=ooxml_docx)
+		return abstract_docx
 	
 	# @property
 	# def effective_structure(self) -> EffectiveStructureFromOoxml:
@@ -77,9 +79,9 @@ class AbstractDocx(ArbitraryBaseModel):
 		if self._views is not None:
 			return self._views
 
-		raise ValueError("Please call")
+		raise ValueError("Please construct")
 
-	def __call__(self, *args, **kwds) -> None:
+	def _construct(self, *args, **kwds) -> None:
 		"""
 		TODO: Parameterization
 		"""
