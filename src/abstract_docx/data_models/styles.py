@@ -166,7 +166,6 @@ class RunStyleProperties(ArbitraryBaseModel):
 	def _ser_font_color(self, v, _info):
 		if v is None:
 			return None
-		# colour.Color exposes hex_l (lowercase) or hex; fall back to str
 		return getattr(v, "hex_l", getattr(v, "hex", str(v)))
 	
 	@classmethod
