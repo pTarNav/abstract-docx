@@ -5,6 +5,7 @@ from enum import Enum
 from colour import Color
 
 from utils.pydantic import ArbitraryBaseModel
+from pydantic import field_serializer
 
 from ooxml_docx.ooxml import OoxmlElement
 import ooxml_docx.structure.properties as OOXML_PROPERTIES
@@ -160,6 +161,12 @@ class RunStyleProperties(ArbitraryBaseModel):
 			italic=Italic.default(),
 			underline=Underline.default()
 		)
+
+	@field_serializer("font_color", when_used="json")
+	def _ser_font_color(self, v, _info):
+		if v is None:
+			return None
+		return getattr(v, "hex_l", getattr(v, "hex", str(v)))
 	
 	@classmethod
 	def from_ooxml(
