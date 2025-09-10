@@ -487,25 +487,30 @@ class OoxmlNumberings(ArbitraryBaseModel):
 			if style.properties is not None:
 				match style_type:
 					case OoxmlStyleTypes.PARAGRAPH:
-						numbering_id: Optional[int] = style.properties.xpath_query(
+						numbering_id: Optional[str] = style.properties.xpath_query(
 							query="./w:numPr/w:numId/@w:val", singleton=True
 						)
 					case OoxmlStyleTypes.NUMBERING:
-						numbering_id: Optional[int] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
+						numbering_id: Optional[str] = style.properties.xpath_query(query="./w:numId/@w:val", singleton=True)
 					case _:
 						raise KeyError((
 							f"Invalid OOXML style type"
 							f" (must be 'OoxmlStyleTypes.PARAGRAPH' or 'OoxmlStyleTypes.Numbering'): {style_type}."
 						))
+					
+				if numbering_id is None and style.parent is not None:
+					# Check if the style inherits a numbering from its parent (if no numbering id found)
+					#  (no need to do it recursively since the traversal is being done top down)
+					numbering_id: Optional[int] = style.parent.numbering.id if style.parent.numbering is not None else None
 				
 				if numbering_id is not None:
 					numbering_id = int(numbering_id)
+
 				numbering: Optional[Numbering] = self.find(id=numbering_id) if numbering_id is not None else None
 				
 				if numbering is not None:
 					style.numbering = numbering
 					# Indentation level is found after all the styles have been assigned their respective numbering
-
 				elif numbering_id is not None:
 					# In some cases (because of ooxml manipulation from external programs),
 					#  there is a numbering reference to an inexistent numbering instance.
