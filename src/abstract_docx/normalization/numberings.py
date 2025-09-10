@@ -293,7 +293,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 					visited_ooxml_abstract_numberings=[]
 				)
 				effective_enumeration = self.effective_enumerations.get(str(ooxml_numbering.id), None)
-				# The effective enumeration must have to been discovered
+				# The effective enumeration must have been discovered
 				if effective_enumeration is None:
 					raise ValueError("") # TODO
 
@@ -336,7 +336,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def load(self) -> None:
 		"""
 		"""
-		self._compute_effective_enumerations()		
+		self._compute_effective_enumerations()
 		self._associate_effective_level_styles()
 
 	def _deduplicate_levels(self) -> None:
@@ -420,7 +420,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def deduplicate(self) -> None:
 		self._deduplicate_levels()
 		self._associate_deduplicated_levels()
-		
+
 		self._deduplicate_enumerations()
 		self._associate_deduplicated_enumerations()
 	

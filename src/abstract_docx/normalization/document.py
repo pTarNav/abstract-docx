@@ -314,7 +314,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 			# TODO Look for any style - numbering association
 			if ooxml_block.numbering is not None:
-				# Case: Index associated through the block (or block style)
+				# Index associated through the block (or block style)
 				effective_block_index: Index = self.effective_numberings_from_ooxml.get_index(
 					ooxml_abstract_numbering_id=ooxml_block.numbering.abstract_numbering.id,
 					ooxml_numbering_id=ooxml_block.numbering.id,
@@ -328,13 +328,14 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		indentation_level: Optional[int] = next((ordered_level_id for ordered_level_id, level in effective_block.format.index.enumeration.levels.items() if level.id == effective_block.format.index.level.id), None)
 		if indentation_level is None:
 			raise ValueError("") # TODO
-		
+
 		if self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] is None:
 			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
 				self.effective_numberings_from_ooxml
 				.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
 			)
 		else:
+			# TODO: im not understanding override start correctly
 			if (
 				prev_effective_block is not None and prev_effective_block.format.index is not None 
 				and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
@@ -343,7 +344,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 				# Start override (change of numbering)
 				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
 					self.effective_numberings_from_ooxml
-					.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
+					.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
 				)
 			else:
 				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1

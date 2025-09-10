@@ -409,7 +409,6 @@ class Numbering(OoxmlElement):
 				level_override.overridden_level = abstract_numbering.levels[level_override.id]
 
 			level_overrides[level_override.id] = level_override
-
 		return level_overrides
 	
 	def find_style_level(self, style: ParagraphStyle | NumberingStyle, visited_abstract_numberings: Optional[list[int]] = None) -> int:
