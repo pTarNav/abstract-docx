@@ -355,7 +355,17 @@ class LevelProperties(ArbitraryBaseModel):
 				override_start=OverrideStart.from_ooxml_val(v=override_start, must_default=must_default)
 			)
 
-		if must_default:	
+		if override_start is not None:
+			# There exists level override but only includes the override start
+			if must_default:
+				_cls: LevelProperties = cls.default()
+			else:
+				_cls: LevelProperties = cls()
+			
+			_cls.override_start = OverrideStart.from_ooxml_val(v=override_start, must_default=must_default)
+			return _cls
+		
+		if must_default:
 			return cls.default()
 		
 		return cls()
