@@ -22,6 +22,7 @@ from utils.printing import rich_tree_to_str
 import dill as pickle
 from utils.pickle import register_picklers
 register_picklers()
+import gzip
 
 import logging
 from colorlog import ColoredFormatter
@@ -223,8 +224,8 @@ class AbstractDocx(ArbitraryBaseModel):
 			f.write(json_data)
 
 	def to_pickle(self) -> bytes:
-		return pickle.dumps(self)
+		return gzip.compress(pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL))
 	
 	@classmethod
 	def from_pickle(cls, b: bytes) -> AbstractDocx:
-		return pickle.loads(b)
+		return pickle.loads(gzip.decompress(b))
