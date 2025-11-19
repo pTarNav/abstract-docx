@@ -19,8 +19,9 @@ Sample usage:
 ```python
 from abstract_docx.main import AbstractDocx
 
-doc: AbstractDocx = AbstractDocx.read(file_path="<your-file-name>.docx") # Read and parse the .docx file
-doc() # Apply the heuristic layer to obtain the effective and hierarchical structures
+# Read and parse the .docx file
+# Apply the heuristic layer to obtain the effective and hierarchical structures
+doc: AbstractDocx = AbstractDocx.read(file_path="<your-file-name>.docx")
 
 # Visualize result
 doc.print()
