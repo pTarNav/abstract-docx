@@ -467,6 +467,11 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
+		# TODO: this is a hotfix in order to get detections, avoiding false negatives because of left whitespace
+		# TODO: need to tackle left whitespace indentation asap and this wont be needed
+		if len(effective_paragraph.content) > 0:
+			effective_paragraph.content[0].text = effective_paragraph.content[0].text.lstrip()
+
 		# Join all the text inside the paragraph content (keeping only the style of the first element).
 		# This is to avoid false negatives in the level detection.
 		full_text: Run = Run(
@@ -475,6 +480,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 		matches: dict[str, dict[str, list[Level]]] = {}
 		for effective_enumeration in self.effective_numberings_from_ooxml.effective_enumerations.values():
+			
 			effective_enumeration_matches: dict[str, list[Level]] = effective_enumeration.detect(run=full_text)
 			if self._n_implied_index_matches(matches={effective_enumeration.id: effective_enumeration_matches}) != 0:
 				matches[effective_enumeration.id] = effective_enumeration_matches

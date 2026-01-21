@@ -469,9 +469,9 @@ class Enumeration(ArbitraryBaseModel):
 			"regex_only": []
 		}
 		
-		detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes
+		# detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes
 		for level_id, level in self.levels.items():
-			if detection_regexes[level_id] is not None:		
+			if self.detection_regexes[level_id] is not None:		
 				match = re.match(self.detection_regexes[level_id], run.text)
 				if match is not None:
 					# Only take run style properties into account,
