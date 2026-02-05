@@ -445,6 +445,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 			# Dummy partial index to detect the level key index string
 			# It should not matter what index combination is used to extract the detected index
+			
 			dummy_enumeration: Enumeration = next(enumeration for enumeration in matched_enumerations)
 			dummy_level: Level = next(level for level in matched_levels if level.id in [l.id for l in dummy_enumeration.levels.values()])
 
@@ -455,6 +456,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			detected_level_key_index_str_match = re.match(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
 
 			if detected_level_key_index_str_match is not None:
+				print(dummy_enumeration.id, dummy_level.id)
+				print([level_key for level_key, level in dummy_enumeration.levels.items() if dummy_level.id == level.id])
+				print(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
 				return detected_level_key_index_str_match.group(1)
 			else:
 				raise ValueError("") # TODO
@@ -467,9 +471,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		:raises ValueError: _description_
 		:return: _description_
 		"""
-		# TODO: this is a hotfix in order to get detections, avoiding false negatives because of left whitespace
+		# ! TODO: this is a hotfix in order to get detections, avoiding false negatives because of left whitespace
 		# TODO: need to tackle left whitespace indentation asap and this wont be needed
-		if len(effective_paragraph.content) > 0:
+		if len(effective_paragraph.content) > 0 and isinstance(effective_paragraph.content[0], Run):
 			effective_paragraph.content[0].text = effective_paragraph.content[0].text.lstrip()
 
 		# Join all the text inside the paragraph content (keeping only the style of the first element).

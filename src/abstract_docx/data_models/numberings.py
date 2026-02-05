@@ -469,10 +469,15 @@ class Enumeration(ArbitraryBaseModel):
 			"regex_only": []
 		}
 		
-		# detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes
+		# detection_regexes: dict[int, Optional[re.Pattern]] = self.detection_regexes => ??
 		for level_id, level in self.levels.items():
-			if self.detection_regexes[level_id] is not None:		
-				match = re.match(self.detection_regexes[level_id], run.text)
+			detection_regex: Optional[re.Pattern] = self.detection_regexes[level_id]
+
+			# ! TODO: It can happen where the dummy regex does not contain any capturing groups, leading to an error when trying to extract the level key index string
+			# TODO: Investigate how is this even possible => What is even the use of constructing this regex that won't be used? => It comes from the Word file itself...
+			# Hotfix => Only use detection regexes that have at least one capturing group
+			if detection_regex is not None and re.compile(detection_regex).groups != 0:		
+				match = re.match(detection_regex, run.text)
 				if match is not None:
 					# Only take run style properties into account,
 					# since using paragraph style properties too can lead to false negatives

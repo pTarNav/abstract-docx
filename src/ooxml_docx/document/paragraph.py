@@ -244,10 +244,18 @@ class Paragraph(OoxmlElement):
 		numbering_style_search_result: Optional[NumberingStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.NUMBERING)
 		if numbering_style_search_result is not None:
 			return numbering_style_search_result
-
+		
 		# ! TODO: What happens if an external program adds a style reference that does not exist?
 		# ! TODO: Research by replicating this, if the word program accepts it as valid ooxml then so should I
-		raise ValueError(f"Undefined style reference for style id: {style_id}")
+		# 05-02-2026: It happened, from a .doc file that was converted natively to a .docx file
+		# From observation, it is referring to a rStyle as a pStyle inside the paragraph.
+		# For now, it seems harmless, in the sense that Word seems to not detect it as a corruption, but just applies the default pStyle
+		# Hotfix => Raise warning and return DocDefault (return None)
+		
+		# raise ValueError(f"Undefined style reference for style id: {style_id}") [old]
+
+		logger.warning(f"Undefined style reference for style id: {style_id}")
+		return None		
 	
 	@staticmethod
 	def _parse_numbering(
