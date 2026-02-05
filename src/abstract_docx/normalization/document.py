@@ -469,7 +469,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		"""
 		# TODO: this is a hotfix in order to get detections, avoiding false negatives because of left whitespace
 		# TODO: need to tackle left whitespace indentation asap and this wont be needed
-		if len(effective_paragraph.content) > 0:
+		if len(effective_paragraph.content) > 0 and isinstance(effective_paragraph.content[0], Run):
 			effective_paragraph.content[0].text = effective_paragraph.content[0].text.lstrip()
 
 		# Join all the text inside the paragraph content (keeping only the style of the first element).
