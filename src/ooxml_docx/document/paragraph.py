@@ -268,7 +268,18 @@ class Paragraph(OoxmlElement):
 		# Case: Direct numbering properties
 		# Direct formatting of numbering properties always overrides any numbering style
 		if ooxml_numbering is not None:
-			numbering_id: int = int(ooxml_numbering.xpath_query(query="./w:numId/@w:val", nullable=False, singleton=True))
+			numbering_id: Optional[str] = ooxml_numbering.xpath_query(query="./w:numId/@w:val", singleton=True)
+			if numbering_id is None:
+				# In some case (because of OOXML manipulation from external programs),
+				#  there is a numbering property in the paragraph that does not reference an actual numbering,
+				#  but instead just points to some irrelevant properties (e.g. <w:ins>).
+				# They are harmless and will be corrected in the abstract_docx normalization step.
+				# Raises a warning instead of an error and proceeds.
+				# ! TODO: What happens if the numbering is actually referenced through the style (it is exiting with this return None)?
+				logger.warning(f"Inexistent numbering reference inside numbering properties.")
+				return None
+			numbering_id: int = int(numbering_id)
+
 			numbering: Optional[Numbering] = numberings.find(id=numbering_id)
 			
 			if numbering is None:
@@ -276,15 +287,16 @@ class Paragraph(OoxmlElement):
 				#  there is a numbering reference to an inexistent numbering instance.
 				# They are harmless and will be corrected in the abstract_docx normalization step.
 				# Raises a warning instead of an error and proceeds.
+				# ! TODO: What happens if the numbering is actually referenced through the style (it is exiting with this return None)?
 				logger.warning(f"Inexistent numbering referenced: {numbering_id=}.")
 				return None				
 
-			indentation_level: Optional[int] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
+			indentation_level: Optional[str] = ooxml_numbering.xpath_query(query="./w:ilvl/@w:val", singleton=True)
 			if indentation_level is None:
 				# Defaults to the lowest one specified inside the numbering definition
 				indentation_level = 0  # ! TODO: Check if this can be anything besides 0
 				logger.warning(f"Lowest indentation level assumption for a paragraph with: {numbering=}.")
-			indentation_level = int(indentation_level)
+			indentation_level: int = int(indentation_level)
 
 			return numbering, indentation_level
 		
