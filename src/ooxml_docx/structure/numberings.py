@@ -100,7 +100,15 @@ class Level(OoxmlElement):
 		if paragraph_style_search_result is not None:
 			return paragraph_style_search_result
 		
-		raise KeyError(f"Inexistent style referenced: {style_id=}.")
+		print(styles)
+		# (From the ECMA Open XML standard):
+		#  If this element references a style which does not exist, or is not a paragraph style, then it can be ignored.
+		# Raises a warning instead of an error and proceeds.
+		
+		# TODO: maybe in the future use the ids in order to specify better in the warning
+		# TODO: int(OoxmlElement(element=ooxml_level.element.getparent()).xpath_query(query="./@w:abstractNumId", nullable=False, singleton=True)))
+		logger.warning(f"Inexistent style referenced: {style_id=} (inside <w:lvl>).")
+		return None		
 
 	def __str__(self) -> str:
 		return f"[bold]{self.id}[/bold]: '{self.style.id if self.style is not None else ''}'"
