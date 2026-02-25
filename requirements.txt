@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 colour==0.1.5
 docopt==0.6.2
-lxml==5.4.0
+lxml==6.0.2
 markdown-it-py==3.0.0
 mdurl==0.1.2
 num2words==0.5.14
