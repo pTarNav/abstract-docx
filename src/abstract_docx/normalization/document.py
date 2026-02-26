@@ -329,27 +329,31 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		if indentation_level is None:
 			raise ValueError("") # TODO
 
+		level_properties: LevelProperties = (
+			self.effective_numberings_from_ooxml
+			.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties
+		)
 		if self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] is None:
 			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
-				self.effective_numberings_from_ooxml
-				.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
+				level_properties.start if level_properties.override_start == -1 else level_properties.override_start
 			)
 		else:
-			# TODO: im not understanding override start correctly
-			if (
-				prev_effective_block is not None and prev_effective_block.format.index is not None 
-				and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
-				and effective_block.format.index.level.properties.override_start != -1
-			):  
-				# Start override (change of numbering)
-				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
-					self.effective_numberings_from_ooxml
-					.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
-				)
-			else:
-				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
+			# # TODO: im not understanding override start correctly
+			# if (
+			# 	prev_effective_block is not None and prev_effective_block.format.index is not None 
+			# 	and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
+			# 	and effective_block.format.index.level.properties.override_start != -1
+			# ):  
+			# 	# Start override (change of numbering)
+			# 	self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
+			# 		self.effective_numberings_from_ooxml
+			# 		.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
+			# 	)
+			# 	print("!!!!!!!!!!!!!!!!!AAAAAAAAAAAAA")
+			# else:
+			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
 
-		# Restart logic
+		# Restart logic for the index counter
 		for level_id in range(
 			indentation_level + 1, len(self._computed_numberings_index_ctr[effective_block.format.index.numbering.id].keys())
 		):
