@@ -329,27 +329,31 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 		if indentation_level is None:
 			raise ValueError("") # TODO
 
+		level_properties: LevelProperties = (
+			self.effective_numberings_from_ooxml
+			.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties
+		)
 		if self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] is None:
 			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
-				self.effective_numberings_from_ooxml
-				.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.start
+				level_properties.start if level_properties.override_start == -1 else level_properties.override_start
 			)
 		else:
-			# TODO: im not understanding override start correctly
-			if (
-				prev_effective_block is not None and prev_effective_block.format.index is not None 
-				and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
-				and effective_block.format.index.level.properties.override_start != -1
-			):  
-				# Start override (change of numbering)
-				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
-					self.effective_numberings_from_ooxml
-					.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
-				)
-			else:
-				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
+			# # TODO: im not understanding override start correctly
+			# if (
+			# 	prev_effective_block is not None and prev_effective_block.format.index is not None 
+			# 	and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
+			# 	and effective_block.format.index.level.properties.override_start != -1
+			# ):  
+			# 	# Start override (change of numbering)
+			# 	self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
+			# 		self.effective_numberings_from_ooxml
+			# 		.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
+			# 	)
+			# 	print("!!!!!!!!!!!!!!!!!AAAAAAAAAAAAA")
+			# else:
+			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
 
-		# Restart logic
+		# Restart logic for the index counter
 		for level_id in range(
 			indentation_level + 1, len(self._computed_numberings_index_ctr[effective_block.format.index.numbering.id].keys())
 		):
@@ -456,9 +460,9 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			detected_level_key_index_str_match = re.match(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
 
 			if detected_level_key_index_str_match is not None:
-				print(dummy_enumeration.id, dummy_level.id)
-				print([level_key for level_key, level in dummy_enumeration.levels.items() if dummy_level.id == level.id])
-				print(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
+				# print(dummy_enumeration.id, dummy_level.id)
+				# print([level_key for level_key, level in dummy_enumeration.levels.items() if dummy_level.id == level.id])
+				# print(dummy_enumeration.detection_regexes[detected_level_key], implied_index_str)
 				return detected_level_key_index_str_match.group(1)
 			else:
 				raise ValueError("") # TODO
@@ -603,24 +607,24 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 
 				if len(implied_index_levels_next_boundary) == len(implied_index_matches): break # All needed implied index level next boundaries have been found
 
-			print("@@@@@@@@@@@@@@@@@@@@@@@@@")
+			# print("@@@@@@@@@@@@@@@@@@@@@@@@@")
 
-			print(f"{effective_paragraph_id=} => {list(implied_index_matches.values())[0].index_str} [{len(implied_index_matches)}]")
-			for iim in implied_index_matches.values():
-				print("\t - ", iim.level.id, iim.level.properties.marker_type, "=>", iim.index_str, iim.index_ctr)
+			# print(f"{effective_paragraph_id=} => {list(implied_index_matches.values())[0].index_str} [{len(implied_index_matches)}]")
+			# for iim in implied_index_matches.values():
+			# 	print("\t - ", iim.level.id, iim.level.properties.marker_type, "=>", iim.index_str, iim.index_ctr)
 
-			print("-------------------------")
+			# print("-------------------------")
 			effective_paragraph: Paragraph = self.effective_document[effective_paragraph_id]
 
 			if len(implied_index_matches) == 1:
 				# If only one implied index match, associate it to the effective paragraph
-				print("## Only one implied index match")
+				# print("## Only one implied index match")
 				effective_paragraph.format.implied_index = next(iter(implied_index_matches.values()))
 			else:
 				# TODO: document this well it is a complex algorithm
-				print("## More than one implied index match")
-				print("Prev boundary", implied_index_levels_prev_boundary)
-				print("Next boundary", implied_index_levels_next_boundary)
+				# print("## More than one implied index match")
+				# print("Prev boundary", implied_index_levels_prev_boundary)
+				# print("Next boundary", implied_index_levels_next_boundary)
 
 				implied_index_matches_continuity_diff: dict[str, dict[str, int]] = {
 					implied_index_level_id: {
@@ -629,8 +633,8 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					}
 					for implied_index_level_id, implied_index_match in implied_index_matches.items()
 				}
-				for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items():
-					print(implied_index_level, "prev continuity", implied_index_match_continuity["prev"], "next continuity", implied_index_match_continuity["next"])
+				# for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items():
+				# 	print(implied_index_level, "prev continuity", implied_index_match_continuity["prev"], "next continuity", implied_index_match_continuity["next"])
 				
 				implied_index_matches_with_full_continuity: dict[str, dict[str, int]] = {
 					implied_index_level: implied_index_match_continuity
@@ -652,46 +656,46 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 					for implied_index_level, implied_index_match_continuity in implied_index_matches_continuity_diff.items()
 					if implied_index_match_continuity["prev"] != 0 and implied_index_match_continuity["next"] != 0
 				}
-				print(
-					"full:", len(implied_index_matches_with_full_continuity),
-					"partial_prev:", len(implied_index_matches_with_partial_prev_continuity),
-					"partial_next:", len(implied_index_matches_with_partial_next_continuity),
-					"none:", len(implied_index_matches_with_no_continuity),
-				)
+				# print(
+				# 	"full:", len(implied_index_matches_with_full_continuity),
+				# 	"partial_prev:", len(implied_index_matches_with_partial_prev_continuity),
+				# 	"partial_next:", len(implied_index_matches_with_partial_next_continuity),
+				# 	"none:", len(implied_index_matches_with_no_continuity),
+				# )
 				
 				match len(implied_index_matches_with_full_continuity):
 					case 0: # No implied index matches with full continuity
-						print("### No implied index match with full continuity")
+						# print("### No implied index match with full continuity")
 						match (len(implied_index_matches_with_partial_prev_continuity), len(implied_index_matches_with_partial_next_continuity)):
 							case (0, 0): # No implied index matches with partial continuity
-								print("#### No implied index match with partial continuity")
+								# print("#### No implied index match with partial continuity")
 								effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # TODO for now to test it
 
 							case (1, 0): # If only one implied index match with partial previous continuity, associate it to the effective paragraph
-								print("#### Only one implied index match with partial previous continuity")
+								# print("#### Only one implied index match with partial previous continuity")
 								effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_partial_prev_continuity.keys()))]
 
 							case (0, 1): # If only one implied index match with partial next continuity, associate it to the effective paragraph
-								print("#### Only one implied index match with partial next continuity")
+								# print("#### Only one implied index match with partial next continuity")
 								effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_partial_next_continuity.keys()))]
 
 							case _:
-								print("#### More than one implied index match with partial continuity")
+								# print("#### More than one implied index match with partial continuity")
 								effective_paragraph.format.implied_index = next(iter(implied_index_matches.values())) # TODO for now to test it
 
 					case 1: # If only one implied index match with full continuity, associate it to the effective paragraph
-						print("### Only one implied index match with full continuity")
+						# print("### Only one implied index match with full continuity")
 						effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_full_continuity.keys()))]
 
 					case _: # More than one implied index match with full continuity
-						print("### More than one implied index match with full continuity")
+						# print("### More than one implied index match with full continuity")
 						effective_paragraph.format.implied_index = implied_index_matches[next(iter(implied_index_matches_with_full_continuity.keys()))] # TODO for now to test it
 			
 			# Update implied index levels previous boundaries based on the decision
 			implied_index_levels_prev_boundary[effective_paragraph.format.implied_index.level.id] = effective_paragraph.format.implied_index.index_ctr			
-			print("!!!!!!!! =>", effective_paragraph.format.implied_index.level.id)
-			print("-------------------------")
-			print()
+			# print("!!!!!!!! =>", effective_paragraph.format.implied_index.level.id)
+			# print("-------------------------")
+			# print()
 
 	def _associate_implied_index_levels(self) -> None:
 		for effective_block in self.effective_document.values():

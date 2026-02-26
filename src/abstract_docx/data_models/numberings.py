@@ -490,6 +490,7 @@ class Enumeration(ArbitraryBaseModel):
 	
 
 class Numbering(ArbitraryBaseModel):
+	# ! TODO: Document what is a numbering in this context
 	id: int
 
 	enumerations: dict[str, Enumeration]
