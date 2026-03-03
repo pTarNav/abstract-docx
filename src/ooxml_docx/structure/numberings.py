@@ -100,7 +100,6 @@ class Level(OoxmlElement):
 		if paragraph_style_search_result is not None:
 			return paragraph_style_search_result
 		
-		print(styles)
 		# (From the ECMA Open XML standard):
 		#  If this element references a style which does not exist, or is not a paragraph style, then it can be ignored.
 		# Raises a warning instead of an error and proceeds.
@@ -475,7 +474,6 @@ class Numbering(OoxmlElement):
 			and self.abstract_numbering.associated_styles.style_parent.numbering is not None
 		):
 			visited_abstract_numberings.append(self.abstract_numbering.id)
-			print("=>", self.abstract_numbering.associated_styles.style_parent)
 			return self.abstract_numbering.associated_styles.style_parent.numbering.find_style_level(
 				style=style, visited_abstract_numberings=visited_abstract_numberings
 			)
@@ -551,7 +549,6 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		"""
 		for style in styles:
 			if style.numbering is not None:
-				print(style.id)
 				style.indentation_level = style.numbering.find_style_level(style=style)
 			
 			if style.children is not None:
