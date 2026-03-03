@@ -111,13 +111,13 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 	def merge_into_effective_enumeration_style(
 			self, effective_enumeration: Optional[Enumeration], effective_abstract_enumeration: Optional[Enumeration]
 		) -> Optional[Enumeration]:
-			if effective_enumeration is None and effective_abstract_enumeration is None:
-				return None
+			if effective_enumeration is not None and effective_abstract_enumeration is not None:
+				# Assumption: The merge can actually be treated the same as aggregation
+				return self.aggregate_effective_enumerations(
+					agg_enumeration=effective_abstract_enumeration, add_enumeration=effective_enumeration
+				)
 			
-			# Assumption: The merge can actually be treated the same as aggregation
-			return self.aggregate_effective_enumerations(
-				agg_enumeration=effective_abstract_enumeration, add_enumeration=effective_enumeration
-			)
+			return effective_enumeration or effective_abstract_enumeration
 
 	def _compute_effective_enumeration_style(
 			self,
@@ -125,7 +125,7 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 			visited_ooxml_numberings: list[int],
 			visited_ooxml_abstract_numberings: list[int]
 		) -> Optional[Enumeration]:
-		# TODO: maybe divide this function into several chunks, it is too long for sure-
+		# TODO: maybe divide this function into several chunks, it is too long for sure
 		effective_enumeration: Optional[Enumeration] = None
 		effective_abstract_enumeration: Optional[Enumeration] = None
 
@@ -154,12 +154,12 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 				if effective_abstract_enumeration is None:
 					raise ValueError("") # TODO
 
-		if ooxml_style_parent.numbering is not None and ooxml_style_parent.numbering not in visited_ooxml_numberings:
+		if ooxml_style_parent.numbering is not None and ooxml_style_parent.numbering.id not in visited_ooxml_numberings:
 			visited_ooxml_numberings.append(ooxml_style_parent.numbering.id)
 
 			# If ooxml numbering has already been discovered, use already computed effective enumeration
 			effective_enumeration = self.effective_enumerations.get(str(ooxml_style_parent.numbering.id), None)
-			
+
 			if effective_enumeration is None:
 				self.compute_effective_enumeration(
 					ooxml_numbering=ooxml_style_parent.numbering,
