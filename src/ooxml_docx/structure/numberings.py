@@ -422,22 +422,28 @@ class Numbering(OoxmlElement):
 	def find_style_level(self, style: ParagraphStyle | NumberingStyle, visited_abstract_numberings: Optional[list[int]] = None) -> int:
 		"""_summary_
 		There are 3 cases when parsing the indentation level (ordered by priority):
-		 - The indentation level is explicit, by stating the indentation level in the numbering properties.
+		 - 1. The indentation level is explicit, by stating the indentation level in the numbering properties.
 		 (Even though the OOXML documentation says it should never happen, in practice it does, therefore,
 		 the assumption is made that if the indentation level is explicitly stated, it should take preference)
-		 - The indentation level is implicit, by referencing the style inside the respective level.
-		 - Lowest indentation level assumption, so there can never be an empty indentation level.
+		 # ! TODO: what says "it" should never happen?
+		 - 2. The indentation level is implicit, by referencing the style inside the respective level.
+		 - 3. Lowest indentation level assumption, so there can never be an empty indentation level.
 		:param numbering_style: _description_
 		:raises ValueError: _description_
 		:return: _description_
 		"""
+		# ! TODO: When does it just inherit the indentation level from the style parent? Maybe that is why we are finding so many lowest indentation assumption mades
+
 		# Ensure that same abstract numbering is not visited twice to avoid infinite recursive loops in the search
 		if visited_abstract_numberings is None:
 			visited_abstract_numberings = []
 		if self.abstract_numbering.id in visited_abstract_numberings:
+			# ! TODO: this is a very ugly hotfix, need to a do lot more research on it, but it is caused by numbering styles and their dumb rules, for the moment return lowest indentation assumption
+			logger.warning(f"Lowest indentation level assumption made for: {style.id=}")
+			return 0
 			raise RecursionError("")  # TODO
 
-		# Case: Style contains an indentation level marker.
+		# Case 1: Style contains an indentation level marker.
 		if isinstance(style, ParagraphStyle):
 			indentation_level: Optional[int] = style.properties.xpath_query(query="./w:numPr/w:ilvl/@w:val", singleton=True)
 		elif isinstance(style, NumberingStyle):
@@ -450,21 +456,31 @@ class Numbering(OoxmlElement):
 		if indentation_level is not None:
 			return int(indentation_level)
 
-		# Case: Indentation level is marked by the style inside the level object.
+		# Case 2: Indentation level is marked by the style inside the level object.
+		
+		# Case 2.1: One of the level override objects contains a reference to the style
+		for i, level_override in self.overrides.items():
+			if level_override.level.style is not None and level_override.level.style.id == style.id:
+				return i
+
+		# Case 2.2: One of the level objects contains a reference to the style
 		for i, level in self.abstract_numbering.levels.items():
 			if level.style is not None and level.style.id == style.id:
 				return i
-		
+
+		# Case 2.3: If the abstract numbering has an associated style parent, try to find if the indentation level is referenced there with the style.
 		if (
 			self.abstract_numbering.associated_styles is not None 
 			and self.abstract_numbering.associated_styles.style_parent is not None
 			and self.abstract_numbering.associated_styles.style_parent.numbering is not None
 		):
 			visited_abstract_numberings.append(self.abstract_numbering.id)
+			print("=>", self.abstract_numbering.associated_styles.style_parent)
 			return self.abstract_numbering.associated_styles.style_parent.numbering.find_style_level(
 				style=style, visited_abstract_numberings=visited_abstract_numberings
 			)
 		
+		# Case 3: Lowest indentation level assumption
 		# In some cases (because of ooxml manipulation from external programs),	
 		#  it might be assumed that the level to be used is the lowest one available.
 		# Raise a warning to log that this assumption has been made.
@@ -535,6 +551,7 @@ class OoxmlNumberings(ArbitraryBaseModel):
 		"""
 		for style in styles:
 			if style.numbering is not None:
+				print(style.id)
 				style.indentation_level = style.numbering.find_style_level(style=style)
 			
 			if style.children is not None:
