@@ -421,8 +421,10 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		self._deduplicate_levels()
 		self._associate_deduplicated_levels()
 
-		self._deduplicate_enumerations()
-		self._associate_deduplicated_enumerations()
+		# ! Enumerations cannot be deduplicated because they also contain information about the index counter
+		# ! I remember doing this for implicit index detection... Lets hope it doesnt break too much
+		# self._deduplicate_enumerations()
+		# self._associate_deduplicated_enumerations()
 	
 	def get_mapped_enumeration_id(self, ooxml_numbering_id: int) -> str:
 		return self.map_ooxml_to_effective_deduplicated_enumerations.get(str(ooxml_numbering_id))
@@ -436,7 +438,8 @@ class EffectiveNumberingsFromOoxml(ArbitraryBaseModel):
 		return self.effective_numberings.get(ooxml_abstract_numbering_id)
 	
 	def get_enumeration(self, ooxml_numbering_id: int) -> Optional[Enumeration]:
-		return self.effective_enumerations.get(self.get_mapped_enumeration_id(ooxml_numbering_id=ooxml_numbering_id))
+		return self.effective_enumerations.get(str(ooxml_numbering_id))
+		# return self.effective_enumerations.get(self.get_mapped_enumeration_id(ooxml_numbering_id=ooxml_numbering_id))
 	
 	def get_level(self, ooxml_numbering_id: int, ooxml_level_id: int) -> Optional[Level]:
 		return self.effective_levels.get(
