@@ -29,6 +29,7 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 	effective_numberings_from_ooxml: EffectiveNumberingsFromOoxml
 
 	_computed_numberings_index_ctr: dict[int, dict[int, Optional[int]]] = {}
+	_instantiated_enumerations: set[int] = set()
 	_effective_paragraphs_implied_index_matches_map: dict[int, dict[str, ImpliedIndex]] = {}
 
 	# Parameters
@@ -337,21 +338,17 @@ class EffectiveDocumentFromOoxml(ArbitraryBaseModel):
 			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
 				level_properties.start if level_properties.override_start == -1 else level_properties.override_start
 			)
-		else:
-			# # TODO: im not understanding override start correctly
-			# if (
-			# 	prev_effective_block is not None and prev_effective_block.format.index is not None 
-			# 	and prev_effective_block.format.index.numbering != effective_block.format.index.numbering 
-			# 	and effective_block.format.index.level.properties.override_start != -1
-			# ):  
-			# 	# Start override (change of numbering)
-			# 	self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = (
-			# 		self.effective_numberings_from_ooxml
-			# 		.effective_enumerations[effective_block.format.index.enumeration.id].levels[indentation_level].properties.override_start
-			# 	)
-			# 	print("!!!!!!!!!!!!!!!!!AAAAAAAAAAAAA")
-			# else:
-			self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
+		else:			
+			if (
+				effective_block.format.index.level.properties.override_start != -1
+				and effective_block.format.index.enumeration.id not in self._instantiated_enumerations
+			):
+				# Index counter override start
+				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] = effective_block.format.index.level.properties.override_start
+				self._instantiated_enumerations.add(effective_block.format.index.enumeration.id) # Each enumeration can only be used to override start once
+			else:
+				# Index counter update
+				self._computed_numberings_index_ctr[effective_block.format.index.numbering.id][indentation_level] += 1
 
 		# Restart logic for the index counter
 		for level_id in range(
