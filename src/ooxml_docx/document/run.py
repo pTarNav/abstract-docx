@@ -138,11 +138,10 @@ class Run(OoxmlElement):
 			return None
 		style_id = str(style_id)
 
-		run_style_search_result: Optional[RunStyle] = styles.find(id=style_id, type=OoxmlStyleTypes.RUN)
-		if run_style_search_result is not None:
-			return run_style_search_result
+		# § 17.3.2.29: ... If this element is omitted, or it references a style which does not exist, 
+		# then no character style should be applied ...
 
-		raise KeyError(f"Inexistent style referenced: {style_id=}.")
+		return styles.find(id=style_id, type=OoxmlStyleTypes.RUN)
 	
 	def __str__(self) -> str:
 		return rich_tree_to_str(self._tree_str_())
