@@ -183,9 +183,11 @@ class MarkerType(Enum):
 			case MarkerType.UPPER_LETTER:
 				return r"[A-Z]+"
 			case MarkerType.LOWER_ROMAN:
-				return r"[ivxlcdm]+"
+				# TODO: support for numbers larger than 3999
+				return r"\b(?=[mdclxvi])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})\b"
 			case MarkerType.UPPER_ROMAN:
-				return r"[IVXLCDM]+"
+				# TODO: support for numbers larger than 3999
+				return r"\b(?=[MDCLXVI])M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\b"
 
 	def counter(self, s: str) -> int:
 		"""Parse a marker string and return its integer counter value (1-based)."""
@@ -274,8 +276,8 @@ class Start(int):
 class Restart(int):
 	"""
 	Special conditions:
-	 - 0: Never restarts.
-	 - -1: Restarts with a new instance of the previous level.
+	- 0: Never restarts.
+	- -1: Restarts with a new instance of the previous level.
 	"""
 	@classmethod
 	def default(cls) -> Restart:
@@ -295,7 +297,7 @@ class Restart(int):
 class OverrideStart(int):
 	"""
 	Special conditions:
-	 - -1: Not defined, should not restart index when changing numberings.
+	- -1: Not defined, should not restart index when changing numberings.
 	"""
 	@classmethod
 	def default(cls) -> OverrideStart:
@@ -439,8 +441,8 @@ class Enumeration(ArbitraryBaseModel):
 			level_indexes_regexes[k] = v.properties.marker_type.detection_regex()
 			if (
 				v.properties.marker_pattern is not None
-				 and v.properties.marker_type is not None
-				 and v.properties.whitespace is not None
+				and v.properties.marker_type is not None
+				and v.properties.whitespace is not None
 			):
 				if v.properties.marker_pattern != "":
 					marker_template_escaped = re.escape(v.properties.marker_pattern)
