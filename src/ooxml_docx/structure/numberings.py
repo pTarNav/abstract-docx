@@ -416,6 +416,7 @@ class Numbering(OoxmlElement):
 				level_override.overridden_level = abstract_numbering.levels[level_override.id]
 
 			level_overrides[level_override.id] = level_override
+		
 		return level_overrides
 	
 	def find_style_level(self, style: ParagraphStyle | NumberingStyle, visited_abstract_numberings: Optional[list[int]] = None) -> int:
@@ -459,7 +460,7 @@ class Numbering(OoxmlElement):
 		
 		# Case 2.1: One of the level override objects contains a reference to the style
 		for i, level_override in self.overrides.items():
-			if level_override.level.style is not None and level_override.level.style.id == style.id:
+			if level_override.level is not None and level_override.level.style is not None and level_override.level.style.id == style.id:
 				return i
 
 		# Case 2.2: One of the level objects contains a reference to the style
